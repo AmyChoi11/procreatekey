@@ -6,16 +6,65 @@
 #include <BLE2902.h>
 #include <BLEHIDDevice.h>
 
+//========= BUTTON FUNCTION CONFIGURATION =========
+// Change these values to set which function each button performs
+// (See the FUNCTION_ constants below)
+#define DEBUG_MODE true  // Set to true to test key codes
+#define BUTTON1_FUNCTION  FUNCTION_HSB       // What BUTTON1_PIN button does
+#define BUTTON2_FUNCTION  FUNCTION_EYE_DROPPER      // What BUTTON2_PIN button does
+//================================================
+
 // Key codes
-#define KEY_LEFT_GUI  0x08  // Command key on iOS
-#define KEY_LEFT_SHIFT 0x02 // Shift key
-#define KEY_Z         0x1D  // Z key
+#define KEY_LEFT_GUI    0xE0  // Command key on iOS
+#define KEY_LEFT_SHIFT  0xE1  // Shift key
+#define KEY_L           0x0F  // L key (Layer panel)
+#define KEY_B           0x05  // B key (Brush/Paint tool)
+#define KEY_S           0x16  // S key (Selection)
+#define KEY_C           0x06  // C key (Color popover)
+#define KEY_V           0x19  // V key (Transform mode/Paste with Cmd)
+#define KEY_Z           0x1D  // Z key (Undo/Redo with modifiers)
+#define KEY_TILDE       0x35  // ~ key 
+#define KEY_R           0x15  // R key 
+#define KEY_A           0x04  // A key (Adjustments)
+#define KEY_SPACE       0x2C  // Space key (QuickMenu)
+#define KEY_TAB         0x2B  // Tab key for navigation
+#define KEY_DOWN        0x51  // Down arrow key
+#define KEY_ENTER       0x28  // Enter/Return key
+#define KEY_X           0x1B  // X key (Previous color)
+#define KEY_E           0x08  // E key (Erase popover)
+#define KEY_J           0x0D  // J key (Duplicate selection with Cmd)
+#define KEY_D           0x07  // D key (Deselect active selection with Cmd)
+#define KEY_0           0x27  // 0 key (Full screen with Cmd)
+#define KEY_U           0x18  // U key (Adjustments panel)
+#define KEY_I           0x0C  // I key (Eye Dropper/Color picker)
 
-// Pins
-#define UNDO_PIN 4
-#define REDO_PIN 5  // Change this to your preferred GPIO
+// Function definitions (corrected shortcuts)
+#define FUNCTION_UNDO          0  // Command+Z
+#define FUNCTION_REDO          1  // Command+Shift+Z
+#define FUNCTION_LAYERS        2  // L (just L key)
+#define FUNCTION_BRUSHES       3  // B (just B key)
+#define FUNCTION_COLORS        4  // C (just C key)
+#define FUNCTION_SELECTION     5  // S (just S key)
+#define FUNCTION_COPY          6  // Command+C
+#define FUNCTION_PASTE         7  // Command+V
+#define FUNCTION_ADJUSTMENTS   8  // Command+A
+#define FUNCTION_QUICKMENU     9  // Space (just Space key)
+#define FUNCTION_TRANSFORM    10  // V (just V key)
+#define FUNCTION_LIQUIFY      11  // Opens Adjustments (Command+A) where Liquify is located
+#define FUNCTION_ERASE        12  // E (just E key)
+#define FUNCTION_PREV_COLOR   13  // X (just X key)
+#define FUNCTION_FULLSCREEN   14  // Command+0
+#define FUNCTION_DUPLICATE    15  // Command+J
+#define FUNCTION_DESELECT     16  // Command+D
+#define FUNCTION_COLOR_BALANCE 17 // Command+B (actual function of Command+B)
+#define FUNCTION_HSB           18 // Command+U (Hue/Saturation/Brightness)
+#define FUNCTION_EYE_DROPPER   19 // I key (Color picker/eye dropper)
 
-// HID Report Map for keyboard - UNCHANGED from original
+// Pins - renamed for clarity
+#define BUTTON1_PIN 4 
+#define BUTTON2_PIN 5 
+
+// HID Report Map for keyboard
 static const uint8_t hidReportMap[] = {
   0x05, 0x01,        // Usage Page (Generic Desktop)
   0x09, 0x06,        // Usage (Keyboard)
@@ -70,11 +119,19 @@ class ServerCallbacks : public BLEServerCallbacks {
 void sendKeyCombo(uint8_t mod, uint8_t key) {
   if (!connected) return;
   
-  // Press keys
+  // Debug output
+  if (DEBUG_MODE) {
+    Serial.print("Sending key combo - Modifier: 0x");
+    Serial.print(mod, HEX);
+    Serial.print(", Key: 0x");
+    Serial.println(key, HEX);
+  }
+  
+  // Press keys with explicit format for iOS
   uint8_t msg[] = {mod, 0, key, 0, 0, 0, 0, 0};
   inputKeyboard->setValue(msg, sizeof(msg));
   inputKeyboard->notify();
-  delay(100);
+  delay(200);  // Longer delay for iOS to process
   
   // Release keys
   uint8_t msg2[] = {0, 0, 0, 0, 0, 0, 0, 0};
@@ -84,14 +141,190 @@ void sendKeyCombo(uint8_t mod, uint8_t key) {
   Serial.println("Sent keyboard command");
 }
 
+// Send a sequence of key presses to navigate to Liquify
+void sendLiquifyMacro() {
+  if (!connected) return;
+  
+  // Step 1: Open Adjustments panel
+  Serial.println("Opening Adjustments panel");
+  sendKeyCombo(0, KEY_U);
+  delay(800); // Wait for panel to open
+  
+  // Step 2: Navigate to Liquify (assuming it's the 3rd option down)
+  // First down arrow press
+  Serial.println("Navigating to Liquify...");
+  
+  // Send down arrow key twice
+  for (int i = 0; i < 2; i++) { //change this number if needed
+    // Press down arrow
+    uint8_t msgDown[] = {0, 0, KEY_DOWN, 0, 0, 0, 0, 0};
+    inputKeyboard->setValue(msgDown, sizeof(msgDown));
+    inputKeyboard->notify();
+    delay(150);
+    
+    // Release down arrow
+    uint8_t msgRelease[] = {0, 0, 0, 0, 0, 0, 0, 0};
+    inputKeyboard->setValue(msgRelease, sizeof(msgRelease));
+    inputKeyboard->notify();
+    delay(150);
+  }
+  
+  // Step 3: Select Liquify with Enter key
+  Serial.println("Selecting Liquify");
+  
+  // Press Enter
+  uint8_t msgEnter[] = {0, 0, KEY_ENTER, 0, 0, 0, 0, 0};
+  inputKeyboard->setValue(msgEnter, sizeof(msgEnter));
+  inputKeyboard->notify();
+  delay(100);
+  
+  // Release Enter
+  uint8_t msgRelease[] = {0, 0, 0, 0, 0, 0, 0, 0};
+  inputKeyboard->setValue(msgRelease, sizeof(msgRelease));
+  inputKeyboard->notify();
+  
+  Serial.println("Liquify macro complete");
+}
+
+// Add this helper function before executeFunction()
+void sendSingleKey(uint8_t key) {
+  if (!connected) return;
+  
+  // Press key
+  uint8_t msgPress[] = {0, 0, key, 0, 0, 0, 0, 0};
+  inputKeyboard->setValue(msgPress, sizeof(msgPress));
+  inputKeyboard->notify();
+  delay(150);
+  
+  // Release key
+  uint8_t msgRelease[] = {0, 0, 0, 0, 0, 0, 0, 0};
+  inputKeyboard->setValue(msgRelease, sizeof(msgRelease));
+  inputKeyboard->notify();
+}
+
+// Execute function based on function ID - with corrected shortcuts
+void executeFunction(int functionId) {
+  if (!connected) return;
+  
+  switch(functionId) {
+    case FUNCTION_UNDO:
+      Serial.println("Sending Undo (Command+Z)");
+      sendKeyCombo(KEY_LEFT_GUI, KEY_Z);
+      break;
+      
+    case FUNCTION_REDO:
+      Serial.println("Sending Redo (Command+Shift+Z)");
+      sendKeyCombo(KEY_LEFT_GUI | KEY_LEFT_SHIFT, KEY_Z);
+      break;
+      
+    case FUNCTION_LAYERS:
+      Serial.println("Opening Layers panel (L)");
+      sendKeyCombo(0, KEY_L);  // No modifier, just L key
+      break;
+      
+    case FUNCTION_BRUSHES:
+      Serial.println("Activating Paint Tool (B)");
+      sendKeyCombo(0, KEY_B);  // No modifier, just B key
+      break;
+      
+    case FUNCTION_COLORS:
+      Serial.println("Opening Color popover (C)");
+      sendKeyCombo(0, KEY_C);  // No modifier, just C key
+      break;
+      
+    case FUNCTION_SELECTION:
+      Serial.println("Selection Mode (S)");
+      sendKeyCombo(0, KEY_S);  // No modifier, just S key
+      break;
+      
+    case FUNCTION_COPY:
+      Serial.println("Copy (Command+C)");
+      sendKeyCombo(KEY_LEFT_GUI, KEY_C);
+      break;
+      
+    case FUNCTION_PASTE:
+      Serial.println("Paste (Command+V)");
+      sendKeyCombo(KEY_LEFT_GUI, KEY_V);
+      break;
+      
+    case FUNCTION_ADJUSTMENTS:
+    {
+      Serial.println("Adjustments panel (U key)");
+      // Use the helper function for a cleaner implementation
+      sendSingleKey(KEY_U);
+      break;
+    }
+      
+    case FUNCTION_QUICKMENU:
+      Serial.println("Quick Menu (Space)");
+      sendKeyCombo(0, KEY_SPACE);  // No modifier, just Space key
+      break;
+      
+    case FUNCTION_TRANSFORM:
+      Serial.println("Transform Mode (V)");
+      sendKeyCombo(0, KEY_V);  // No modifier, just V key
+      break;
+    
+    case FUNCTION_LIQUIFY:
+      Serial.println("Executing Liquify macro sequence");
+      sendLiquifyMacro();
+      break;
+      
+    case FUNCTION_ERASE:
+      Serial.println("Erase Popover (E)");
+      sendKeyCombo(0, KEY_E);  // No modifier, just E key
+      break;
+      
+    case FUNCTION_PREV_COLOR:
+      Serial.println("Previous Color (X)");
+      sendKeyCombo(0, KEY_X);  // No modifier, just X key
+      break;
+      
+    case FUNCTION_FULLSCREEN:
+      Serial.println("Full Screen (Command+0)");
+      sendKeyCombo(KEY_LEFT_GUI, KEY_0);
+      break;
+      
+    case FUNCTION_DUPLICATE:
+      Serial.println("Duplicate Selection (Command+J)");
+      sendKeyCombo(KEY_LEFT_GUI, KEY_J);
+      break;
+      
+    case FUNCTION_DESELECT:
+      Serial.println("Deselect Active Selection (Command+D)");
+      sendKeyCombo(KEY_LEFT_GUI, KEY_D);
+      break;
+      
+    case FUNCTION_COLOR_BALANCE:
+      Serial.println("Color Balance (Command+B)");
+      sendKeyCombo(KEY_LEFT_GUI, KEY_B);
+      break;
+
+    case FUNCTION_HSB:
+      Serial.println("Hue/Saturation/Brightness (Command+U)");
+      sendKeyCombo(KEY_LEFT_GUI, KEY_U);
+      break;
+      
+    case FUNCTION_EYE_DROPPER:
+      Serial.println("Color Eye Dropper (I)");
+      sendKeyCombo(0, KEY_I);  // Just I key, no modifier
+      break;
+
+    default:
+      Serial.println("Unknown function");
+      break;
+  }
+}
+
+// Update setup() and loop() to use the new pin names
 void setup() {
   Serial.begin(115200);
   
   // Configure button pins
-  pinMode(UNDO_PIN, INPUT_PULLUP);
-  pinMode(REDO_PIN, INPUT_PULLUP); // Add second button
+  pinMode(BUTTON1_PIN, INPUT_PULLUP);
+  pinMode(BUTTON2_PIN, INPUT_PULLUP);
   
-  // Initialize BLE - UNCHANGED from original
+  // Initialize BLE
   BLEDevice::init("ProcreateKey");
   BLEServer* server = BLEDevice::createServer();
   server->setCallbacks(new ServerCallbacks());
@@ -121,38 +354,46 @@ void setup() {
   advertising->addServiceUUID(hid->hidService()->getUUID());
   advertising->start();
   
-  Serial.println("BLE Keyboard Ready - Press Buttons for Undo/Redo");
+  // Print current button configuration
+  Serial.println("BLE Keyboard Ready - Current Configuration:");
+  Serial.print("Button 1 (Pin ");
+  Serial.print(BUTTON1_PIN);
+  Serial.print("): Function ");
+  Serial.println(BUTTON1_FUNCTION);
+  
+  Serial.print("Button 2 (Pin ");
+  Serial.print(BUTTON2_PIN);
+  Serial.print("): Function ");
+  Serial.println(BUTTON2_FUNCTION);
 }
 
 void loop() {
-  // Original UNDO functionality
-  if(digitalRead(UNDO_PIN) == LOW) {
+  // Button 1 functionality
+  if(digitalRead(BUTTON1_PIN) == LOW) {
     if(connected) {
-      Serial.println("Undo button pressed - sending Command+Z");
-      sendKeyCombo(KEY_LEFT_GUI, KEY_Z);
+      executeFunction(BUTTON1_FUNCTION);
       delay(300);
     } else {
       Serial.println("Not connected");
     }
     
     // Debounce
-    while(digitalRead(UNDO_PIN) == LOW) {
+    while(digitalRead(BUTTON1_PIN) == LOW) {
       delay(10);
     }
   }
   
-  // New REDO functionality
-  if(digitalRead(REDO_PIN) == LOW) {
+  // Button 2 functionality
+  if(digitalRead(BUTTON2_PIN) == LOW) {
     if(connected) {
-      Serial.println("Redo button pressed - sending Command+Shift+Z");
-      sendKeyCombo(KEY_LEFT_GUI | KEY_LEFT_SHIFT, KEY_Z);
+      executeFunction(BUTTON2_FUNCTION);
       delay(300);
     } else {
       Serial.println("Not connected");
     }
     
     // Debounce
-    while(digitalRead(REDO_PIN) == LOW) {
+    while(digitalRead(BUTTON2_PIN) == LOW) {
       delay(10);
     }
   }
