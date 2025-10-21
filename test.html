@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iPad BLE Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #007aff;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            margin: 10px 0;
+        }
+        button:active {
+            background: #0051d5;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .log {
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+        .success { color: #34c759; }
+        .error { color: #ff3b30; }
+        .info { color: #007aff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔵 iPad Web Bluetooth Test</h1>
+        <p>Test if Web Bluetooth API works on your iPad</p>
+        
+        <button onclick="testAnyDevice()">Test 1: Scan for ANY Bluetooth Device</button>
+        <button onclick="testWithService()">Test 2: Scan for XIAO (with service filter)</button>
+        <button onclick="testWithName()">Test 3: Scan for XIAO (by name)</button>
+        <button onclick="clearLog()">Clear Log</button>
+        
+        <div class="log" id="log">Click a test button to start...</div>
+    </div>
+
+    <script>
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            const className = type;
+            logDiv.innerHTML += `<span class="${className}">[${time}] ${message}</span>\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(`[${time}] ${message}`);
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+            log('Log cleared', 'info');
+        }
+
+        async function testAnyDevice() {
+            log('═══ TEST 1: ANY DEVICE ═══', 'info');
+            log('This will show ALL Bluetooth devices nearby...', 'info');
+            
+            try {
+                log('Checking if Web Bluetooth is supported...', 'info');
+                
+                if (!navigator.bluetooth) {
+                    log('❌ Web Bluetooth is NOT supported on this browser!', 'error');
+                    log('Try Safari on iOS 16.4+', 'error');
+                    return;
+                }
+                
+                log('✓ Web Bluetooth is supported!', 'success');
+                log('Opening device picker...', 'info');
+                
+                const device = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true,
+                    optionalServices: ['12345678-1234-5678-1234-56789abcdef0']
+                });
+                
+                log(`✓ Found device: ${device.name || 'Unnamed'} (${device.id})`, 'success');
+                log('✓ TEST 1 PASSED!', 'success');
+                
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+                if (error.name === 'NotFoundError') {
+                    log('No device selected or none found', 'error');
+                } else if (error.name === 'SecurityError') {
+                    log('Bluetooth permission denied', 'error');
+                }
+            }
+        }
+
+        async function testWithService() {
+            log('═══ TEST 2: WITH SERVICE FILTER ═══', 'info');
+            log('Looking for XIAO with service UUID...', 'info');
+            
+            try {
+                if (!navigator.bluetooth) {
+                    log('❌ Web Bluetooth NOT supported', 'error');
+                    return;
+                }
+                
+                log('Opening device picker with service filter...', 'info');
+                
+                const device = await navigator.bluetooth.requestDevice({
+                    filters: [{
+                        services: ['12345678-1234-5678-1234-56789abcdef0']
+                    }]
+                });
+                
+                log(`✓ Found device: ${device.name || 'Unnamed'} (${device.id})`, 'success');
+                
+                // Try to connect
+                log('Attempting to connect...', 'info');
+                const server = await device.gatt.connect();
+                log('✓ Connected!', 'success');
+                
+                // Get services
+                log('Getting services...', 'info');
+                const services = await server.getPrimaryServices();
+                log(`✓ Found ${services.length} services`, 'success');
+                
+                await device.gatt.disconnect();
+                log('✓ TEST 2 PASSED!', 'success');
+                
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+                if (error.name === 'NotFoundError') {
+                    log('No compatible device found', 'error');
+                    log('Make sure ESP32 is powered on and nearby', 'error');
+                    log('Make sure CONFIG_MODE = 1 in firmware', 'error');
+                }
+            }
+        }
+
+        async function testWithName() {
+            log('═══ TEST 3: WITH NAME FILTER ═══', 'info');
+            log('Looking for devices named "XIAO"...', 'info');
+            
+            try {
+                if (!navigator.bluetooth) {
+                    log('❌ Web Bluetooth NOT supported', 'error');
+                    return;
+                }
+                
+                log('Opening device picker with name prefix...', 'info');
+                
+                const device = await navigator.bluetooth.requestDevice({
+                    filters: [{
+                        namePrefix: 'XIAO'
+                    }],
+                    optionalServices: ['12345678-1234-5678-1234-56789abcdef0']
+                });
+                
+                log(`✓ Found device: ${device.name} (${device.id})`, 'success');
+                
+                // Try to connect
+                log('Attempting to connect...', 'info');
+                const server = await device.gatt.connect();
+                log('✓ Connected!', 'success');
+                
+                await device.gatt.disconnect();
+                log('✓ TEST 3 PASSED!', 'success');
+                
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+                if (error.name === 'NotFoundError') {
+                    log('No device with name starting with "XIAO" found', 'error');
+                }
+            }
+        }
+
+        // Check on page load
+        window.addEventListener('load', () => {
+            log('Page loaded', 'info');
+            log('iPad Web Bluetooth Test Ready', 'success');
+            log('', 'info');
+            
+            if (navigator.bluetooth) {
+                log('✓ Web Bluetooth API is available!', 'success');
+                log('You can run the tests above.', 'info');
+            } else {
+                log('❌ Web Bluetooth API is NOT available', 'error');
+                log('Requirements:', 'error');
+                log('- Safari on iOS 16.4 or later', 'error');
+                log('- HTTPS connection (or localhost)', 'error');
+            }
+        });
+    </script>
+</body>
+</html>
