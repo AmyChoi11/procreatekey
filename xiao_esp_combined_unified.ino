@@ -7,7 +7,9 @@
 #include <BLEServer.h>
 #include <BLE2902.h>
 #include <BLEHIDDevice.h>
-#include <Arduino.h>
+#include <WiFi.h>
+#include <WebServer.h>
+#include <WebSocketsServer.h>
 #include <ArduinoJson.h>
 #include <Preferences.h>
 
@@ -50,10 +52,9 @@ BLECharacteristic* input;
 BLECharacteristic* output;
 bool bleConnected = false;
 
-// BLE GATT for config/status/events
-BLECharacteristic* configChar;
-BLECharacteristic* eventChar;
-BLECharacteristic* statusChar;
+// Web server & WebSocket
+WebServer server(80);
+WebSocketsServer webSocket(81);
 // Non-volatile storage for configuration
 Preferences prefs;
 
@@ -107,14 +108,11 @@ class MyServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) {
     bleConnected = true;
     Serial.println(F("iPad/iOS CONNECTED via BLE!"));
-
-    // Notify central via event characteristic
-    if (eventChar) {
-      String msg = "{\"type\":\"ble_status\",\"connected\":true,\"timestamp\":" + String(millis()) + "}";
-      eventChar->setValue(msg.c_str());
-      eventChar->notify();
-    }
-
+    
+    // Broadcast to web clients
+    String msg = "{\"type\":\"ble_status\",\"connected\":true,\"timestamp\":" + String(millis()) + "}";
+    webSocket.broadcastTXT(msg);
+    
     // LED feedback
     for (int i = 0; i < 3; i++) {
       digitalWrite(LED_PIN, HIGH);
@@ -128,13 +126,10 @@ class MyServerCallbacks : public BLEServerCallbacks {
     bleConnected = false;
     Serial.println(F("iPad/iOS DISCONNECTED"));
     
-    // Notify central via event characteristic
-    if (eventChar) {
-      String msg = "{\"type\":\"ble_status\",\"connected\":false,\"timestamp\":" + String(millis()) + "}";
-      eventChar->setValue(msg.c_str());
-      eventChar->notify();
-    }
-
+    // Broadcast to web clients
+    String msg = "{\"type\":\"ble_status\",\"connected\":false,\"timestamp\":" + String(millis()) + "}";
+    webSocket.broadcastTXT(msg);
+    
     // Restart advertising
     BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
     pAdvertising->start();
@@ -145,46 +140,266 @@ class MyServerCallbacks : public BLEServerCallbacks {
 // ============================================
 // WEBSOCKET HANDLERS
 // ============================================
-// No WebSocket - BLE GATT will handle config and events
-
-// Helper: send event notification (JSON string) over BLE
-void notifyEvent(const String &msg) {
-  if (eventChar) {
-    eventChar->setValue(msg.c_str());
-    eventChar->notify();
+void webSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length) {
+  switch(type) {
+    case WStype_DISCONNECTED:
+      Serial.printf("[WS] Client #%u disconnected\n", num);
+      break;
+      
+    case WStype_CONNECTED: {
+      Serial.printf("[WS] Client #%u connected\n", num);
+      
+      // Send current status to new client
+      String status = "{\"type\":\"init\",\"bleConnected\":" + String(bleConnected ? "true" : "false") + 
+                     ",\"uptime\":" + String(millis() - startTime) + 
+                     ",\"button1\":" + String(button1Function) + 
+                     ",\"button2\":" + String(button2Function) + 
+                     ",\"button3\":" + String(button3Function) + "}";
+      webSocket.sendTXT(num, status);
+      break;
+    }
+    
+    case WStype_TEXT:
+      Serial.printf("[WS] Received: %s\n", payload);
+      break;
   }
-  Serial.println("Event: " + msg);
 }
 
-// No web UI - configuration and events are handled over BLE GATT characteristics
+// ============================================
+// WEB PAGES (compact for flash savings)
+// ============================================
+const char* htmlPage = R"rawliteral(
+<!doctype html><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
+<title>ESP32 BLE Controller</title>
+<style>
+body{font-family:sans-serif;background:#f0f0f0;padding:15px;margin:0}
+.card{background:white;padding:15px;margin:10px 0;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}
+h1{color:#333;margin:0 0 10px}
+.status{padding:8px;border-radius:4px;margin:5px 0;font-size:14px}
+.connected{background:#e8f5e9;color:#2e7d32}
+.disconnected{background:#ffebee;color:#c62828}
+select,button{width:100%;padding:10px;margin:5px 0;border:1px solid #ddd;border-radius:4px;font-size:14px}
+button{background:#2196f3;color:white;border:none;cursor:pointer}
+button:active{background:#1976d2}
+#events{font-family:monospace;max-height:150px;overflow:auto;background:#263238;color:#aed581;padding:8px;border-radius:4px;font-size:12px}
+.event{margin:2px 0;padding:2px}
+</style>
+<body>
+<div class='card'>
+  <h1>ESP32 BLE Controller</h1>
+  <div id='bleStatus' class='status disconnected'>BLE: Disconnected</div>
+  <div id='wsStatus' class='status disconnected'>WebSocket: Disconnected</div>
+  <div>IP: <span id='deviceIP'>-</span></div>
+</div>
+
+<div class='card'>
+  <h3>Button Configuration</h3>
+  <label>Button 1:</label>
+  <select id='btn1'>
+    <option value='0'>Left Click</option>
+    <option value='1'>Right Click</option>
+    <option value='2'>Double Click</option>
+    <option value='3' selected>Undo (Cmd+Z)</option>
+    <option value='4'>Redo (Cmd+Shift+Z)</option>
+  </select>
+  
+  <label>Button 2:</label>
+  <select id='btn2'>
+    <option value='0'>Left Click</option>
+    <option value='1'>Right Click</option>
+    <option value='2'>Double Click</option>
+    <option value='3'>Undo (Cmd+Z)</option>
+    <option value='4' selected>Redo (Cmd+Shift+Z)</option>
+  </select>
+  
+  <label>Button 3:</label>
+  <select id='btn3'>
+    <option value='0'>Left Click</option>
+    <option value='1'>Right Click</option>
+    <option value='2'>Double Click</option>
+    <option value='3' selected>Undo (Cmd+Z)</option>
+    <option value='4'>Redo (Cmd+Shift+Z)</option>
+  </select>
+  
+  <button onclick='applyConfig()'>Apply Configuration</button>
+</div>
+
+<div class='card'>
+  <h3>Live Events</h3>
+  <div id='events'></div>
+</div>
+
+<script>
+let ws;
+let counts = {1: 0, 2: 0, 3: 0};
+
+function connect() {
+  ws = new WebSocket('ws://' + location.hostname + ':81');
+  
+  ws.onopen = function() {
+    document.getElementById('wsStatus').textContent = 'WebSocket: Connected';
+    document.getElementById('wsStatus').className = 'status connected';
+    addEvent('WebSocket connected');
+  };
+  
+  ws.onclose = function() {
+    document.getElementById('wsStatus').textContent = 'WebSocket: Disconnected';
+    document.getElementById('wsStatus').className = 'status disconnected';
+    setTimeout(connect, 2000);
+  };
+  
+  ws.onmessage = function(event) {
+    try {
+      const data = JSON.parse(event.data);
+      handleMessage(data);
+    } catch(e) {
+      console.error('Parse error:', e);
+    }
+  };
+}
+
+function handleMessage(data) {
+  if (data.type === 'init') {
+    updateBLEStatus(data.bleConnected);
+    // Explicitly check for undefined/null so that a value of 0 is preserved
+    if (typeof data.button1 !== 'undefined' && data.button1 !== null) {
+      document.getElementById('btn1').value = data.button1;
+    } else {
+      document.getElementById('btn1').value = 3;
+    }
+
+    if (typeof data.button2 !== 'undefined' && data.button2 !== null) {
+      document.getElementById('btn2').value = data.button2;
+    } else {
+      document.getElementById('btn2').value = 4;
+    }
+
+    if (typeof data.button3 !== 'undefined' && data.button3 !== null) {
+      document.getElementById('btn3').value = data.button3;
+    } else {
+      document.getElementById('btn3').value = 3;
+    }
+
+    addEvent('Received device status');
+  } else if (data.type === 'ble_status') {
+    updateBLEStatus(data.connected);
+    addEvent('BLE: ' + (data.connected ? 'Connected' : 'Disconnected'));
+  } else if (data.type === 'button_press') {
+    counts[data.button]++;
+    addEvent('Btn' + data.button + ': ' + data.action + ' ' + (data.success ? 'OK' : 'FAIL'));
+  }
+}
+
+function updateBLEStatus(connected) {
+  const el = document.getElementById('bleStatus');
+  if (connected) {
+    el.textContent = 'BLE: Connected';
+    el.className = 'status connected';
+  } else {
+    el.textContent = 'BLE: Disconnected';
+    el.className = 'status disconnected';
+  }
+}
+
+function addEvent(message) {
+  const eventDiv = document.createElement('div');
+  eventDiv.className = 'event';
+  const now = new Date();
+  eventDiv.textContent = now.toLocaleTimeString() + ' ' + message;
+  
+  const container = document.getElementById('events');
+  container.insertBefore(eventDiv, container.firstChild);
+  
+  // Keep only last 20 events
+  while (container.children.length > 20) {
+    container.removeChild(container.lastChild);
+  }
+}
+
+async function applyConfig() {
+  const config = {
+    buttons: {
+      button1: parseInt(document.getElementById('btn1').value),
+      button2: parseInt(document.getElementById('btn2').value),
+      button3: parseInt(document.getElementById('btn3').value)
+    }
+  };
+  
+  try {
+    const response = await fetch('/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config)
+    });
+    
+    const result = await response.json();
+    addEvent('Config: ' + result.status);
+  } catch (e) {
+    addEvent('Config failed: ' + e.message);
+  }
+}
+
+// Auto-load device IP
+fetch('/status').then(r => r.json()).then(data => {
+  document.getElementById('deviceIP').textContent = data.ip || 'unknown';
+}).catch(() => {});
+
+connect();
+</script>
+</body>
+</html>
+)rawliteral";
 
 // ============================================
 // WEB SERVER HANDLERS
 // ============================================
-// BLE Config write callback
-class ConfigCallbacks : public BLECharacteristicCallbacks {
-  void onWrite(BLECharacteristic* pChar) {
-    std::string val = pChar->getValue();
-    if (val.length() == 0) return;
-    String body = String((char*)val.c_str());
-    Serial.println(F("Received configuration (BLE):"));
-    Serial.println(body);
+void handleRoot() {
+  server.send(200, "text/html", htmlPage);
+}
 
+void handleStatus() {
+  String json = "{";
+  json += "\"bleConnected\":" + String(bleConnected ? "true" : "false") + ",";
+  json += "\"uptime\":" + String(millis() - startTime) + ",";
+  json += "\"button1Presses\":" + String(pressCount1) + ",";
+  json += "\"button2Presses\":" + String(pressCount2) + ",";
+  json += "\"button3Presses\":" + String(pressCount3) + ",";
+  json += "\"button1\":" + String(button1Function) + ",";
+  json += "\"button2\":" + String(button2Function) + ",";
+  json += "\"button3\":" + String(button3Function) + ",";
+  json += "\"ip\":\"" + WiFi.localIP().toString() + "\"}";
+  server.send(200, "application/json", json);
+}
+
+void handleConfig() {
+  // Enable CORS
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  server.sendHeader("Access-Control-Allow-Headers", "Content-Type");
+  
+  if (server.hasArg("plain")) {
+    String body = server.arg("plain");
+    Serial.println(F("Received configuration:"));
+    Serial.println(body);
+    
     DynamicJsonDocument doc(1024);
     DeserializationError error = deserializeJson(doc, body);
+    
     if (error) {
       Serial.print(F("JSON parse error: "));
       Serial.println(error.c_str());
+      server.send(400, "application/json", "{\"status\":\"error\",\"message\":\"JSON parse failed\"}");
       return;
     }
-
+    
+    // Update configuration
     if (doc.containsKey("buttons")) {
       JsonObject buttons = doc["buttons"];
       bool changed = false;
 
-      auto validateAndAssign = [&](const char* key, int &target) {
+      auto validateAndAssign = [&](const char* key, int &target, int defaultVal) {
         if (buttons.containsKey(key)) {
-          int v = buttons[key] | 0;
+          int v = buttons[key] | 0; // get integer (but avoid using as default)
+          // Validate range 0-4
           if (v >= 0 && v <= 4) {
             if (target != v) {
               target = v;
@@ -196,10 +411,11 @@ class ConfigCallbacks : public BLECharacteristicCallbacks {
         }
       };
 
-      validateAndAssign("button1", button1Function);
-      validateAndAssign("button2", button2Function);
-      validateAndAssign("button3", button3Function);
+      validateAndAssign("button1", button1Function, button1Function);
+      validateAndAssign("button2", button2Function, button2Function);
+      validateAndAssign("button3", button3Function, button3Function);
 
+      // Persist if changed
       if (changed) {
         prefs.putInt("b1", button1Function);
         prefs.putInt("b2", button2Function);
@@ -209,15 +425,21 @@ class ConfigCallbacks : public BLECharacteristicCallbacks {
       Serial.printf("Configuration updated: Btn1=%d, Btn2=%d, Btn3=%d\n", 
                     button1Function, button2Function, button3Function);
 
-      // Notify central of update
-      if (statusChar) {
-        String resp = "{\"status\":\"success\",\"message\":\"Configuration applied\"}";
-        statusChar->setValue(resp.c_str());
-        statusChar->notify();
-      }
+      server.send(200, "application/json", "{\"status\":\"success\",\"message\":\"Configuration applied\"}");
+    } else {
+      server.send(400, "application/json", "{\"status\":\"error\",\"message\":\"No buttons configuration\"}");
     }
+  } else {
+    server.send(400, "application/json", "{\"status\":\"error\",\"message\":\"No data received\"}");
   }
-};
+}
+
+void handleOptions() {
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  server.sendHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  server.sendHeader("Access-Control-Allow-Headers", "Content-Type, Accept, User-Agent");
+  server.send(204);
+}
 
 // ============================================
 // BLE KEYBOARD FUNCTIONS
