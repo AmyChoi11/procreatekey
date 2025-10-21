@@ -1,11 +1,11 @@
 {
-    "name": "Procreate BLE Keyboard Config",
-    "short_name": "Procreate Config",
+    "name": "procreate_ble_config",
+    "short_name": "procreate_ble_config",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "Configure your Procreate keyboard buttons via Bluetooth",
+    "description": "A new Flutter project.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
