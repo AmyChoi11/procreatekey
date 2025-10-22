@@ -4,10 +4,8 @@ import CoreBluetooth
 struct ContentView: View {
     @StateObject private var bleManager = BLEManager()
     
-    @State private var circleButton1: String = "Undo"
-    @State private var circleButton2: String = "Undo"
-    @State private var buttons12: String = "Color Palette"
-    @State private var dial: String = "Layers"
+    // Store configuration as numeric codes, just like the working version
+    @State private var config: [String: Int] = ["button1": 3, "button2": 3, "button3": 7, "dial": 9]
     @State private var showDeviceSheet = false
     @State private var hasShownInitialSheet = false
     
@@ -48,10 +46,30 @@ struct ContentView: View {
                         .padding(.horizontal)
                         #endif
                         
-                        toolDropdown(icon: "circle.fill", title: "Circle Button 1", selection: $circleButton1, options: circleButton1Options)
-                        toolDropdown(icon: "circle.lefthalf.filled", title: "Circle Button 2", selection: $circleButton2, options: circleButton2Options)
-                        toolDropdown(icon: "gamecontroller.fill", title: "Buttons 1 + 2", selection: $buttons12, options: buttons12Options)
-                        toolDropdown(icon: "dial.medium.fill", title: "Dial", selection: $dial, options: dialOptions)
+                        toolDropdown(
+                            icon: "circle.fill", 
+                            title: "Circle Button 1", 
+                            configKey: "button1",
+                            options: circleButton1Options
+                        )
+                        toolDropdown(
+                            icon: "circle.lefthalf.filled", 
+                            title: "Circle Button 2", 
+                            configKey: "button2",
+                            options: circleButton2Options
+                        )
+                        toolDropdown(
+                            icon: "gamecontroller.fill", 
+                            title: "Buttons 1 + 2", 
+                            configKey: "button3",
+                            options: buttons12Options
+                        )
+                        toolDropdown(
+                            icon: "dial.medium.fill", 
+                            title: "Dial", 
+                            configKey: "dial",
+                            options: dialOptions
+                        )
                         
                         if !bleManager.statusMessage.isEmpty {
                             VStack(spacing: 8) {
@@ -114,30 +132,9 @@ struct ContentView: View {
             }
         }
         .onReceive(bleManager.$currentConfig) { newConfig in
-            // Update UI when configuration is loaded from device
-            print("📥 Loading configuration from device:")
-            print("  Raw config: \(newConfig)")
-            
-            if let button1Code = newConfig["button1"] {
-                let option = functionCodeToOptionForButton(button1Code, validOptions: circleButton1Options, defaultOption: "Undo")
-                print("  Circle Button 1: code \(button1Code) → '\(option)'")
-                circleButton1 = option
-            }
-            if let button2Code = newConfig["button2"] {
-                let option = functionCodeToOptionForButton(button2Code, validOptions: circleButton2Options, defaultOption: "Undo")
-                print("  Circle Button 2: code \(button2Code) → '\(option)'")
-                circleButton2 = option
-            }
-            if let button3Code = newConfig["button3"] {
-                let option = functionCodeToOptionForButton(button3Code, validOptions: buttons12Options, defaultOption: "Color Palette")
-                print("  Buttons 1+2: code \(button3Code) → '\(option)'")
-                buttons12 = option
-            }
-            if let dialCode = newConfig["dial"] {
-                let option = functionCodeToOptionForButton(dialCode, validOptions: dialOptions, defaultOption: "Layers")
-                print("  Dial: code \(dialCode) → '\(option)'")
-                dial = option
-            }
+            // Update local config when device config is read - exactly like the working version
+            print("📥 Loading configuration from device: \(newConfig)")
+            self.config = newConfig
         }
         .onAppear {
             // Automatically show device selection sheet on first launch
@@ -152,7 +149,17 @@ struct ContentView: View {
     }
     
     @ViewBuilder
-    func toolDropdown(icon: String, title: String, selection: Binding<String>, options: [String]) -> some View {
+    func toolDropdown(icon: String, title: String, configKey: String, options: [String]) -> some View {
+        let selection = Binding<String>(
+            get: { 
+                let code = config[configKey] ?? 0
+                return codeToOption(code, validOptions: options)
+            },
+            set: { newValue in
+                config[configKey] = optionToCode(newValue)
+            }
+        )
+        
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: icon).foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6)).font(.system(size: 20))
@@ -162,7 +169,6 @@ struct ContentView: View {
                 ForEach(options, id: \.self) { option in
                     Button(action: { 
                         selection.wrappedValue = option
-                        // Removed auto-save - user must press the save button explicitly
                     }) {
                         HStack { Text(option); if selection.wrappedValue == option { Image(systemName: "checkmark") } }
                     }
@@ -186,7 +192,8 @@ struct ContentView: View {
         return Color.gray.opacity(0.2)
     }
     
-    func optionToFunctionCode(_ option: String) -> Int {
+    // Convert option string to numeric code
+    func optionToCode(_ option: String) -> Int {
         switch option {
         case "Undo": return 3
         case "Redo": return 4
@@ -201,48 +208,34 @@ struct ContentView: View {
         }
     }
     
-    func functionCodeToOption(_ code: Int) -> String {
+    // Convert numeric code to option string, with validation
+    func codeToOption(_ code: Int, validOptions: [String]) -> String {
+        let option: String
         switch code {
-        case 3: return "Undo"
-        case 4: return "Redo"
-        case 5: return "Erase"
-        case 6: return "Brush Size (saved presets only)"
-        case 7: return "Color Palette"
-        case 8: return "Brush Library"
-        case 9: return "Layers"
-        case 10: return "Pen Opacity"
-        case 11: return "Brush Size"
-        default: return "Undo"
+        case 3: option = "Undo"
+        case 4: option = "Redo"
+        case 5: option = "Erase"
+        case 6: option = "Brush Size (saved presets only)"
+        case 7: option = "Color Palette"
+        case 8: option = "Brush Library"
+        case 9: option = "Layers"
+        case 10: option = "Pen Opacity"
+        case 11: option = "Brush Size"
+        default: option = validOptions.first ?? "Undo"
         }
-    }
-    
-    func functionCodeToOptionForButton(_ code: Int, validOptions: [String], defaultOption: String) -> String {
-        let option = functionCodeToOption(code)
-        // Check if the decoded option is valid for this button
+        
+        // Validate the option is valid for this button
         if validOptions.contains(option) {
             return option
         } else {
-            // If not valid, return the default for this button
-            print("⚠️ Invalid option '\(option)' for button with options: \(validOptions). Using default: \(defaultOption)")
-            return defaultOption
+            print("⚠️ Invalid option '\(option)' for valid options: \(validOptions). Using first available.")
+            return validOptions.first ?? "Undo"
         }
     }
     
     func saveConfiguration() {
-        var config: [String: Int] = [:]
-        config["button1"] = optionToFunctionCode(circleButton1)
-        config["button2"] = optionToFunctionCode(circleButton2)
-        config["button3"] = optionToFunctionCode(buttons12)
-        config["dial"] = optionToFunctionCode(dial)
-        
-        // Debug logging
         print("📤 Saving configuration:")
-        print("  Circle Button 1: '\(circleButton1)' → code \(config["button1"] ?? 0)")
-        print("  Circle Button 2: '\(circleButton2)' → code \(config["button2"] ?? 0)")
-        print("  Buttons 1+2: '\(buttons12)' → code \(config["button3"] ?? 0)")
-        print("  Dial: '\(dial)' → code \(config["dial"] ?? 0)")
         print("  Full config: \(config)")
-        
         bleManager.writeConfig(config: config)
     }
 }
