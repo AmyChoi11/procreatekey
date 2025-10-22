@@ -1,6 +1,6 @@
 // This is a generated file; do not edit or check into version control.
-FLUTTER_ROOT=C:\flutter\flutter
-FLUTTER_APPLICATION_PATH=D:\ISDN3002\eSketch
+FLUTTER_ROOT=/Users/Belen/Downloads/flutter
+FLUTTER_APPLICATION_PATH=/Users/Belen/Documents/eSketch-combine_widget/combined_app/flutter_app
 COCOAPODS_PARALLEL_CODE_SIGN=true
 FLUTTER_BUILD_DIR=build
 FLUTTER_BUILD_NAME=1.0.0

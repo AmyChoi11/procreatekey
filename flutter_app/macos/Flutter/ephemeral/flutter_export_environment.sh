@@ -1,7 +1,7 @@
 #!/bin/sh
 # This is a generated file; do not edit or check into version control.
-export "FLUTTER_ROOT=C:\flutter\flutter"
-export "FLUTTER_APPLICATION_PATH=D:\ISDN3002\eSketch"
+export "FLUTTER_ROOT=/Users/Belen/Downloads/flutter"
+export "FLUTTER_APPLICATION_PATH=/Users/Belen/Documents/eSketch-combine_widget/combined_app/flutter_app"
 export "COCOAPODS_PARALLEL_CODE_SIGN=true"
 export "FLUTTER_BUILD_DIR=build"
 export "FLUTTER_BUILD_NAME=1.0.0"
