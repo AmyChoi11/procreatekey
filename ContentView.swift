@@ -8,7 +8,7 @@ struct ContentView: View {
     @State private var circleButton2: String = "Undo"
     @State private var buttons12: String = "Color Palette"
     @State private var dial: String = "Layers"
-    @State private var showDeviceSheet = false
+    @State private var showDeviceSheet = true  // Changed to true to show immediately
     @State private var hasShownInitialSheet = false
     
     let circleButton1Options = ["Undo", "Redo", "Erase", "Brush Size (saved presets only)"]
@@ -76,14 +76,16 @@ struct ContentView: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
         }
         .sheet(isPresented: $showDeviceSheet) { DeviceSelectionSheet(bleManager: bleManager, showDeviceSheet: $showDeviceSheet) }
-        .onReceive(bleManager.$isConnected) { connected in if connected { showDeviceSheet = false } }
+        .onReceive(bleManager.$isConnected) { connected in 
+            if connected { 
+                showDeviceSheet = false 
+            }
+        }
         .onAppear {
+            // Start scanning immediately when the view appears
             if !hasShownInitialSheet && !bleManager.isConnected {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    bleManager.startScan()
-                    showDeviceSheet = true
-                    hasShownInitialSheet = true
-                }
+                hasShownInitialSheet = true
+                bleManager.startScan()
             }
         }
     }
