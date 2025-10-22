@@ -1,290 +1,578 @@
-import SwiftUIimport SwiftUI
+import SwiftUIimport SwiftUIimport SwiftUI
+
+import CoreBluetooth
 
 import CoreBluetoothimport CoreBluetooth
 
+struct ContentView: View {
 
+    @StateObject private var bleManager = BLEManager()
 
-struct ContentView: View {struct ContentView: View {
+    
 
-    @StateObject private var bleManager = BLEManager()    @StateObject private var bleManager = BLEManager()
+    // Tool selections matching the Flutter UIstruct ContentView: View {struct ContentView: View {
 
-        @State private var selectedDevice: CBPeripheral?
+    @State private var circleButton1: String = "Undo"
 
-    // Tool selections matching the Flutter UI    @State private var showDevicePicker = false
+    @State private var circleButton2: String = "Undo"    @StateObject private var bleManager = BLEManager()    @StateObject private var bleManager = BLEManager()
 
-    @State private var circleButton1: String = "Undo"    @State private var config: [String: Int] = ["button1": 4, "button2": 1, "button3": 3]
+    @State private var buttons12: String = "Color Palette"
 
-    @State private var circleButton2: String = "Undo"
+    @State private var dial: String = "Layers"        @State private var selectedDevice: CBPeripheral?
 
-    @State private var buttons12: String = "Color Palette"    let actions = ["Left Click", "Right Click", "Double Click", "Undo", "Redo"]
+    @State private var showDeviceSheet = false
 
-    @State private var dial: String = "Layers"    
+        // Tool selections matching the Flutter UI    @State private var showDevicePicker = false
 
-    @State private var showDeviceSheet = false    // Map action index to function code
+    // Tool options matching Flutter
 
-        func actionToCode(_ index: Int) -> Int {
+    let circleButton1Options = ["Undo", "Redo", "Erase", "Brush Size (saved presets only)"]    @State private var circleButton1: String = "Undo"    @State private var config: [String: Int] = ["button1": 4, "button2": 1, "button3": 3]
 
-    // Tool options matching Flutter        return index // 0=Left, 1=Right, 2=Double, 3=Undo, 4=Redo
+    let circleButton2Options = ["Undo", "Redo", "Erase", "Brush Size (saved presets only)"]
 
-    let circleButton1Options = ["Undo", "Redo", "Erase", "Brush Size (saved presets only)"]    }
+    let buttons12Options = ["Color Palette", "Brush Library"]    @State private var circleButton2: String = "Undo"
 
-    let circleButton2Options = ["Undo", "Redo", "Erase", "Brush Size (saved presets only)"]    
+    let dialOptions = ["Layers", "Pen Opacity", "Brush Size"]
 
-    let buttons12Options = ["Color Palette", "Brush Library"]    // Map function code to action index
+        @State private var buttons12: String = "Color Palette"    let actions = ["Left Click", "Right Click", "Double Click", "Undo", "Redo"]
 
-    let dialOptions = ["Layers", "Pen Opacity", "Brush Size"]    func codeToAction(_ code: Int) -> Int {
+    var body: some View {
 
-            return code
+        NavigationView {    @State private var dial: String = "Layers"    
 
-    var body: some View {    }
+            ScrollView {
 
-        NavigationView {
+                VStack(spacing: 20) {    @State private var showDeviceSheet = false    // Map action index to function code
 
-            ScrollView {    var body: some View {
+                    // Tool dropdowns
 
-                VStack(spacing: 20) {        NavigationView {
+                    toolDropdown(        func actionToCode(_ index: Int) -> Int {
 
-                    // Tool dropdowns            VStack(spacing: 24) {
+                        icon: "circle.fill",
 
-                    toolDropdown(                Text("Procreate BLE Config")
+                        title: "Circle Button 1",    // Tool options matching Flutter        return index // 0=Left, 1=Right, 2=Double, 3=Undo, 4=Redo
 
-                        icon: "circle.fill",                    .font(.largeTitle)
+                        selection: $circleButton1,
 
-                        title: "Circle Button 1",                    .bold()
+                        options: circleButton1Options    let circleButton1Options = ["Undo", "Redo", "Erase", "Brush Size (saved presets only)"]    }
 
-                        selection: $circleButton1,                    .padding(.top)
+                    )
 
-                        options: circleButton1Options                
+                        let circleButton2Options = ["Undo", "Redo", "Erase", "Brush Size (saved presets only)"]    
 
-                    )                Text(bleManager.statusMessage)
+                    toolDropdown(
 
-                                        .foregroundColor(.gray)
+                        icon: "circle.lefthalf.filled",    let buttons12Options = ["Color Palette", "Brush Library"]    // Map function code to action index
 
-                    toolDropdown(                    .multilineTextAlignment(.center)
+                        title: "Circle Button 2",
 
-                        icon: "circle.lefthalf.filled",                    .padding(.horizontal)
+                        selection: $circleButton2,    let dialOptions = ["Layers", "Pen Opacity", "Brush Size"]    func codeToAction(_ code: Int) -> Int {
 
-                        title: "Circle Button 2",                
+                        options: circleButton2Options
 
-                        selection: $circleButton2,                if !bleManager.isConnected {
+                    )            return code
 
-                        options: circleButton2Options                    Button(action: { 
+                    
 
-                    )                        bleManager.startScan()
+                    toolDropdown(    var body: some View {    }
 
-                                            showDevicePicker = true 
+                        icon: "gamecontroller.fill",
 
-                    toolDropdown(                    }) {
+                        title: "Buttons 1 + 2",        NavigationView {
 
-                        icon: "gamecontroller.fill",                        HStack {
+                        selection: $buttons12,
 
-                        title: "Buttons 1 + 2",                            if bleManager.isScanning {
+                        options: buttons12Options            ScrollView {    var body: some View {
 
-                        selection: $buttons12,                                ProgressView()
+                    )
 
-                        options: buttons12Options                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    VStack(spacing: 20) {        NavigationView {
 
-                    )                                Text("Scanning...")
+                    toolDropdown(
 
-                                                } else {
+                        icon: "dial.medium.fill",                    // Tool dropdowns            VStack(spacing: 24) {
 
-                    toolDropdown(                                Image(systemName: "antenna.radiowaves.left.and.right")
+                        title: "Dial",
 
-                        icon: "dial.medium.fill",                                Text("Scan for Devices")
+                        selection: $dial,                    toolDropdown(                Text("Procreate BLE Config")
 
-                        title: "Dial",                            }
+                        options: dialOptions
 
-                        selection: $dial,                        }
+                    )                        icon: "circle.fill",                    .font(.largeTitle)
 
-                        options: dialOptions                        .frame(maxWidth: .infinity)
+                    
 
-                    )                        .padding()
+                    // Status message                        title: "Circle Button 1",                    .bold()
 
-                                            .background(Color.blue)
+                    if !bleManager.statusMessage.isEmpty {
 
-                    // Status message                        .foregroundColor(.white)
+                        VStack(spacing: 8) {                        selection: $circleButton1,                    .padding(.top)
 
-                    if !bleManager.statusMessage.isEmpty {                        .cornerRadius(10)
+                            Image(systemName: bleManager.statusMessage.contains("❌") ? "xmark.circle.fill" : "checkmark.circle.fill")
 
-                        VStack(spacing: 8) {                    }
+                                .font(.system(size: 32))                        options: circleButton1Options                
 
-                            Image(systemName: bleManager.statusMessage.contains("❌") ? "xmark.circle.fill" : "checkmark.circle.fill")                    .disabled(bleManager.isScanning)
+                                .foregroundColor(bleManager.statusMessage.contains("❌") ? .red : .green)
 
-                                .font(.system(size: 32))                    .padding(.horizontal)
+                                                )                Text(bleManager.statusMessage)
 
-                                .foregroundColor(bleManager.statusMessage.contains("❌") ? .red : .green)                } else {
+                            Text(bleManager.statusMessage)
 
-                                                HStack {
+                                .multilineTextAlignment(.center)                                        .foregroundColor(.gray)
 
-                            Text(bleManager.statusMessage)                        Image(systemName: "checkmark.circle.fill")
+                                .padding()
 
-                                .multilineTextAlignment(.center)                            .foregroundColor(.green)
+                        }                    toolDropdown(                    .multilineTextAlignment(.center)
 
-                                .padding()                        Text("Connected")
+                        .frame(maxWidth: .infinity)
 
-                        }                            .foregroundColor(.green)
+                        .background(                        icon: "circle.lefthalf.filled",                    .padding(.horizontal)
 
-                        .frame(maxWidth: .infinity)                            .bold()
+                            RoundedRectangle(cornerRadius: 12)
 
-                        .background(                        Spacer()
+                                .fill(bleManager.statusMessage.contains("❌") ? Color.red.opacity(0.1) : Color.green.opacity(0.1))                        title: "Circle Button 2",                
 
-                            RoundedRectangle(cornerRadius: 12)                        Button("Disconnect") {
+                        )
 
-                                .fill(bleManager.statusMessage.contains("❌") ? Color.red.opacity(0.1) : Color.green.opacity(0.1))                            bleManager.disconnect()
+                        .padding(.horizontal)                        selection: $circleButton2,                if !bleManager.isConnected {
 
-                        )                        }
+                    }
 
-                        .padding(.horizontal)                        .foregroundColor(.red)
+                }                        options: circleButton2Options                    Button(action: { 
 
-                    }                    }
+                .padding()
 
-                }                    .padding()
+            }                    )                        bleManager.startScan()
 
-                .padding()                    .background(Color.green.opacity(0.1))
+            .navigationTitle("eSketch Shortcuts")
 
-            }                    .cornerRadius(10)
+            .navigationBarTitleDisplayMode(.inline)                                            showDevicePicker = true 
 
-            .navigationTitle("eSketch Shortcuts")                    .padding(.horizontal)
+            .toolbar {
 
-            .navigationBarTitleDisplayMode(.inline)                }
+                // Bluetooth button in leading position                    toolDropdown(                    }) {
 
-            .toolbar {                
+                ToolbarItem(placement: .navigationBarLeading) {
 
-                // Bluetooth button in leading position                if showDevicePicker {
+                    Button(action: {                        icon: "gamecontroller.fill",                        HStack {
 
-                ToolbarItem(placement: .navigationBarLeading) {                    VStack {
+                        if !bleManager.isScanning {
 
-                    Button(action: {                        HStack {
+                            bleManager.startScan()                        title: "Buttons 1 + 2",                            if bleManager.isScanning {
 
-                        if !bleManager.isScanning {                            Text("Available Devices (\(bleManager.devices.count))")
+                            showDeviceSheet = true
 
-                            bleManager.startScan()                                .font(.headline)
+                        }                        selection: $buttons12,                                ProgressView()
 
-                            showDeviceSheet = true                            Spacer()
+                    }) {
 
-                        }                            if bleManager.isScanning {
+                        Image(systemName: bleManager.isScanning ? "antenna.radiowaves.left.and.right" : "bluetooth")                        options: buttons12Options                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
 
-                    }) {                                ProgressView()
+                            .foregroundColor(.white)
 
-                        Image(systemName: bleManager.isScanning ? "antenna.radiowaves.left.and.right" : "bluetooth")                            } else {
+                    }                    )                                Text("Scanning...")
 
-                            .foregroundColor(.white)                                Button("Scan Again") {
+                    .disabled(bleManager.isScanning)
 
-                    }                                    bleManager.startScan()
+                }                                                } else {
 
-                    .disabled(bleManager.isScanning)                                }
+                
 
-                }                                .font(.caption)
+                // Disconnect button (only show when connected)                    toolDropdown(                                Image(systemName: "antenna.radiowaves.left.and.right")
 
-                                            }
+                ToolbarItem(placement: .navigationBarTrailing) {
 
-                // Disconnect button (only show when connected)                        }
+                    if bleManager.isConnected {                        icon: "dial.medium.fill",                                Text("Scan for Devices")
 
-                ToolbarItem(placement: .navigationBarTrailing) {                        .padding(.horizontal)
+                        Button(action: {
 
-                    if bleManager.isConnected {                        
+                            bleManager.disconnect()                        title: "Dial",                            }
 
-                        Button(action: {                        if bleManager.devices.isEmpty {
+                        }) {
 
-                            bleManager.disconnect()                            VStack(spacing: 10) {
+                            Image(systemName: "link.slash")                        selection: $dial,                        }
 
-                        }) {                                Image(systemName: "wifi.slash")
+                                .foregroundColor(.white)
 
-                            Image(systemName: "link.slash")                                    .font(.largeTitle)
+                        }                        options: dialOptions                        .frame(maxWidth: .infinity)
 
-                                .foregroundColor(.white)                                    .foregroundColor(.gray)
+                    }
 
-                        }                                Text("No devices found")
+                }                    )                        .padding()
 
-                    }                                    .foregroundColor(.gray)
+                
 
-                }                                Text("Make sure ESP32 is powered on")
+                // Save button                                            .background(Color.blue)
 
-                                                    .font(.caption)
+                ToolbarItem(placement: .navigationBarTrailing) {
 
-                // Save button                                    .foregroundColor(.gray)
+                    Button(action: {                    // Status message                        .foregroundColor(.white)
 
-                ToolbarItem(placement: .navigationBarTrailing) {                            }
+                        saveConfiguration()
 
-                    Button(action: {                            .frame(height: 150)
+                    }) {                    if !bleManager.statusMessage.isEmpty {                        .cornerRadius(10)
 
-                        saveConfiguration()                        } else {
+                        Image(systemName: "square.and.arrow.down")
 
-                    }) {                            List(bleManager.devices, id: \.identifier) { device in
+                            .foregroundColor(.white)                        VStack(spacing: 8) {                    }
 
-                        Image(systemName: "square.and.arrow.down")                                Button(action: {
+                    }
 
-                            .foregroundColor(.white)                                    bleManager.connect(to: device)
+                    .disabled(!bleManager.isConnected)                            Image(systemName: bleManager.statusMessage.contains("❌") ? "xmark.circle.fill" : "checkmark.circle.fill")                    .disabled(bleManager.isScanning)
 
-                    }                                    selectedDevice = device
+                }
 
-                    .disabled(!bleManager.isConnected)                                    showDevicePicker = false
+            }                                .font(.system(size: 32))                    .padding(.horizontal)
 
-                }                                }) {
+            .toolbarBackground(Color(red: 0.4, green: 0.2, blue: 0.6), for: .navigationBar)
 
-            }                                    HStack {
+            .toolbarBackground(.visible, for: .navigationBar)                                .foregroundColor(bleManager.statusMessage.contains("❌") ? .red : .green)                } else {
 
-            .toolbarBackground(Color(red: 0.4, green: 0.2, blue: 0.6), for: .navigationBar)                                        VStack(alignment: .leading) {
+            .toolbarColorScheme(.dark, for: .navigationBar)
 
-            .toolbarBackground(.visible, for: .navigationBar)                                            Text(device.name ?? "Unknown Device")
+        }                                                HStack {
 
-            .toolbarColorScheme(.dark, for: .navigationBar)                                                .font(.headline)
+        .sheet(isPresented: $showDeviceSheet) {
 
-        }                                            Text(device.identifier.uuidString)
+            DeviceSelectionSheet(bleManager: bleManager, showDeviceSheet: $showDeviceSheet)                            Text(bleManager.statusMessage)                        Image(systemName: "checkmark.circle.fill")
 
-        .sheet(isPresented: $showDeviceSheet) {                                                .font(.caption)
+        }
 
-            DeviceSelectionSheet(bleManager: bleManager, showDeviceSheet: $showDeviceSheet)                                                .foregroundColor(.gray)
+        .onReceive(bleManager.$isConnected) { connected in                                .multilineTextAlignment(.center)                            .foregroundColor(.green)
 
-        }                                        }
+            if connected {
 
-        .onReceive(bleManager.$isConnected) { connected in                                        Spacer()
+                showDeviceSheet = false                                .padding()                        Text("Connected")
 
-            if connected {                                        Image(systemName: "chevron.right")
+            }
 
-                showDeviceSheet = false                                            .foregroundColor(.gray)
+        }                        }                            .foregroundColor(.green)
 
-            }                                    }
+    }
 
-        }                                    .padding(.vertical, 4)
+                            .frame(maxWidth: .infinity)                            .bold()
 
-    }                                }
+    // Helper function to build tool dropdown cards
 
-                                }
+    @ViewBuilder                        .background(                        Spacer()
 
-    // Helper function to build tool dropdown cards                            .frame(maxHeight: 250)
+    func toolDropdown(icon: String, title: String, selection: Binding<String>, options: [String]) -> some View {
 
-    @ViewBuilder                        }
+        VStack(alignment: .leading, spacing: 12) {                            RoundedRectangle(cornerRadius: 12)                        Button("Disconnect") {
 
-    func toolDropdown(icon: String, title: String, selection: Binding<String>, options: [String]) -> some View {                    }
+            HStack {
 
-        VStack(alignment: .leading, spacing: 12) {                }
+                Image(systemName: icon)                                .fill(bleManager.statusMessage.contains("❌") ? Color.red.opacity(0.1) : Color.green.opacity(0.1))                            bleManager.disconnect()
 
-            HStack {                
+                    .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
 
-                Image(systemName: icon)                if bleManager.isConnected {
+                    .font(.system(size: 20))                        )                        }
 
-                    .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))                    VStack(spacing: 16) {
+                Text(title)
 
-                    .font(.system(size: 20))                        Text("Button Configuration")
+                    .font(.system(size: 18, weight: .bold))                        .padding(.horizontal)                        .foregroundColor(.red)
 
-                Text(title)                            .font(.headline)
+                    .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
 
-                    .font(.system(size: 18, weight: .bold))                        
+            }                    }                    }
 
-                    .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))                        Form {
+            
 
-            }                            ForEach(["button1", "button2", "button3"], id: \.self) { key in
+            Menu {                }                    .padding()
 
-                                            Picker(key.replacingOccurrences(of: "button", with: "Button "), selection: Binding(
+                ForEach(options, id: \.self) { option in
 
-            Menu {                                    get: { codeToAction(config[key] ?? 0) },
+                    Button(action: {                .padding()                    .background(Color.green.opacity(0.1))
 
-                ForEach(options, id: \.self) { option in                                    set: { config[key] = actionToCode($0) }
+                        selection.wrappedValue = option
 
-                    Button(action: {                                )) {
+                        // Auto-save when connected            }                    .cornerRadius(10)
 
-                        selection.wrappedValue = option                                    ForEach(0..<actions.count, id: \.self) { i in
+                        if bleManager.isConnected {
+
+                            saveConfiguration()            .navigationTitle("eSketch Shortcuts")                    .padding(.horizontal)
+
+                        }
+
+                    }) {            .navigationBarTitleDisplayMode(.inline)                }
+
+                        HStack {
+
+                            Text(option)            .toolbar {                
+
+                            if selection.wrappedValue == option {
+
+                                Image(systemName: "checkmark")                // Bluetooth button in leading position                if showDevicePicker {
+
+                            }
+
+                        }                ToolbarItem(placement: .navigationBarLeading) {                    VStack {
+
+                    }
+
+                }                    Button(action: {                        HStack {
+
+            } label: {
+
+                HStack {                        if !bleManager.isScanning {                            Text("Available Devices (\(bleManager.devices.count))")
+
+                    Text(selection.wrappedValue)
+
+                        .foregroundColor(.black)                            bleManager.startScan()                                .font(.headline)
+
+                        .fontWeight(.medium)
+
+                    Spacer()                            showDeviceSheet = true                            Spacer()
+
+                    Image(systemName: "chevron.down")
+
+                        .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))                        }                            if bleManager.isScanning {
+
+                }
+
+                .padding()                    }) {                                ProgressView()
+
+                .background(getToolColor(for: selection.wrappedValue))
+
+                .cornerRadius(8)                        Image(systemName: bleManager.isScanning ? "antenna.radiowaves.left.and.right" : "bluetooth")                            } else {
+
+                .overlay(
+
+                    RoundedRectangle(cornerRadius: 8)                            .foregroundColor(.white)                                Button("Scan Again") {
+
+                        .stroke(Color(red: 0.4, green: 0.2, blue: 0.6).opacity(0.3), lineWidth: 1)
+
+                )                    }                                    bleManager.startScan()
+
+            }
+
+                                .disabled(bleManager.isScanning)                                }
+
+            Text("Selected: \(selection.wrappedValue)")
+
+                .font(.system(size: 14))                }                                .font(.caption)
+
+                .foregroundColor(.gray)
+
+        }                                            }
+
+        .padding()
+
+        .background(                // Disconnect button (only show when connected)                        }
+
+            RoundedRectangle(cornerRadius: 12)
+
+                .fill(Color.white)                ToolbarItem(placement: .navigationBarTrailing) {                        .padding(.horizontal)
+
+                .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+
+        )                    if bleManager.isConnected {                        
+
+    }
+
+                            Button(action: {                        if bleManager.devices.isEmpty {
+
+    // Get background color based on selection
+
+    func getToolColor(for option: String) -> Color {                            bleManager.disconnect()                            VStack(spacing: 10) {
+
+        if option == "Undo" || option == "Erase" {
+
+            return Color(red: 1.0, green: 0.76, blue: 0.8) // #FFC1CC pink                        }) {                                Image(systemName: "wifi.slash")
+
+        }
+
+        return Color.gray.opacity(0.2)                            Image(systemName: "link.slash")                                    .font(.largeTitle)
+
+    }
+
+                                    .foregroundColor(.white)                                    .foregroundColor(.gray)
+
+    // Map UI options to firmware function codes
+
+    func optionToFunctionCode(_ option: String) -> Int {                        }                                Text("No devices found")
+
+        switch option {
+
+        case "Undo": return 3                    }                                    .foregroundColor(.gray)
+
+        case "Redo": return 4
+
+        case "Erase", "Brush Size (saved presets only)",                 }                                Text("Make sure ESP32 is powered on")
+
+             "Color Palette", "Brush Library", 
+
+             "Layers", "Pen Opacity", "Brush Size":                                                    .font(.caption)
+
+            return 0 // Default to Left Click for unsupported options
+
+        default: return 0                // Save button                                    .foregroundColor(.gray)
+
+        }
+
+    }                ToolbarItem(placement: .navigationBarTrailing) {                            }
+
+    
+
+    // Save configuration to device                    Button(action: {                            .frame(height: 150)
+
+    func saveConfiguration() {
+
+        // Map UI selections to firmware button codes                        saveConfiguration()                        } else {
+
+        var config: [String: Int] = [:]
+
+        config["button1"] = optionToFunctionCode(circleButton1)                    }) {                            List(bleManager.devices, id: \.identifier) { device in
+
+        config["button2"] = optionToFunctionCode(circleButton2)
+
+        config["button3"] = optionToFunctionCode(buttons12)                        Image(systemName: "square.and.arrow.down")                                Button(action: {
+
+        
+
+        bleManager.writeConfig(config: config)                            .foregroundColor(.white)                                    bleManager.connect(to: device)
+
+    }
+
+}                    }                                    selectedDevice = device
+
+
+
+// Device selection sheet                    .disabled(!bleManager.isConnected)                                    showDevicePicker = false
+
+struct DeviceSelectionSheet: View {
+
+    @ObservedObject var bleManager: BLEManager                }                                }) {
+
+    @Binding var showDeviceSheet: Bool
+
+                }                                    HStack {
+
+    var body: some View {
+
+        NavigationView {            .toolbarBackground(Color(red: 0.4, green: 0.2, blue: 0.6), for: .navigationBar)                                        VStack(alignment: .leading) {
+
+            VStack {
+
+                if bleManager.isScanning {            .toolbarBackground(.visible, for: .navigationBar)                                            Text(device.name ?? "Unknown Device")
+
+                    VStack(spacing: 20) {
+
+                        ProgressView()            .toolbarColorScheme(.dark, for: .navigationBar)                                                .font(.headline)
+
+                            .scaleEffect(1.5)
+
+                        Text("Scanning for devices...")        }                                            Text(device.identifier.uuidString)
+
+                            .font(.headline)
+
+                        Text("Make sure your ESP32 is powered on")        .sheet(isPresented: $showDeviceSheet) {                                                .font(.caption)
+
+                            .font(.caption)
+
+                            .foregroundColor(.gray)            DeviceSelectionSheet(bleManager: bleManager, showDeviceSheet: $showDeviceSheet)                                                .foregroundColor(.gray)
+
+                    }
+
+                    .frame(maxHeight: .infinity)        }                                        }
+
+                } else if bleManager.devices.isEmpty {
+
+                    VStack(spacing: 20) {        .onReceive(bleManager.$isConnected) { connected in                                        Spacer()
+
+                        Image(systemName: "magnifyingglass")
+
+                            .font(.system(size: 50))            if connected {                                        Image(systemName: "chevron.right")
+
+                            .foregroundColor(.gray)
+
+                        Text("No devices found")                showDeviceSheet = false                                            .foregroundColor(.gray)
+
+                            .font(.headline)
+
+                        Button("Scan Again") {            }                                    }
+
+                            bleManager.startScan()
+
+                        }        }                                    .padding(.vertical, 4)
+
+                        .buttonStyle(.bordered)
+
+                    }    }                                }
+
+                    .frame(maxHeight: .infinity)
+
+                } else {                                }
+
+                    List(bleManager.devices, id: \.identifier) { device in
+
+                        Button(action: {    // Helper function to build tool dropdown cards                            .frame(maxHeight: 250)
+
+                            bleManager.connect(to: device)
+
+                            showDeviceSheet = false    @ViewBuilder                        }
+
+                        }) {
+
+                            VStack(alignment: .leading, spacing: 4) {    func toolDropdown(icon: String, title: String, selection: Binding<String>, options: [String]) -> some View {                    }
+
+                                Text(device.name ?? "Unknown Device")
+
+                                    .font(.headline)        VStack(alignment: .leading, spacing: 12) {                }
+
+                                Text(device.identifier.uuidString)
+
+                                    .font(.caption)            HStack {                
+
+                                    .foregroundColor(.gray)
+
+                            }                Image(systemName: icon)                if bleManager.isConnected {
+
+                            .padding(.vertical, 8)
+
+                        }                    .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))                    VStack(spacing: 16) {
+
+                    }
+
+                                        .font(.system(size: 20))                        Text("Button Configuration")
+
+                    Text("Found \(bleManager.devices.count) device(s)")
+
+                        .font(.caption)                Text(title)                            .font(.headline)
+
+                        .foregroundColor(.gray)
+
+                        .padding()                    .font(.system(size: 18, weight: .bold))                        
+
+                }
+
+            }                    .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))                        Form {
+
+            .navigationTitle("Select Device")
+
+            .navigationBarTitleDisplayMode(.inline)            }                            ForEach(["button1", "button2", "button3"], id: \.self) { key in
+
+            .toolbar {
+
+                ToolbarItem(placement: .navigationBarTrailing) {                                            Picker(key.replacingOccurrences(of: "button", with: "Button "), selection: Binding(
+
+                    Button("Cancel") {
+
+                        bleManager.stopScan()            Menu {                                    get: { codeToAction(config[key] ?? 0) },
+
+                        showDeviceSheet = false
+
+                    }                ForEach(options, id: \.self) { option in                                    set: { config[key] = actionToCode($0) }
+
+                }
+
+            }                    Button(action: {                                )) {
+
+        }
+
+    }                        selection.wrappedValue = option                                    ForEach(0..<actions.count, id: \.self) { i in
+
+}
 
                         // Auto-save when connected                                        Text(actions[i]).tag(i)
 

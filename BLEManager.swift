@@ -5,7 +5,6 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
     @Published var devices: [CBPeripheral] = []
     @Published var isConnected: Bool = false
     @Published var statusMessage: String = ""
-    @Published var currentConfig: [String: Int] = ["button1": 4, "button2": 1, "button3": 3]
     @Published var isScanning: Bool = false
     private var central: CBCentralManager!
     private var targetPeripheral: CBPeripheral?
@@ -187,7 +186,6 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
                 if let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
                    let buttons = json["buttons"] as? [String: Int] {
                     DispatchQueue.main.async {
-                        self.currentConfig = buttons
                         self.statusMessage = "✓ Config loaded from device!"
                         print("✓ Parsed config: \(buttons)")
                     }
