@@ -8,7 +8,7 @@ struct ContentView: View {
     @State private var circleButton2: String = "Undo"
     @State private var buttons12: String = "Color Palette"
     @State private var dial: String = "Layers"
-    @State private var showDeviceSheet = true  // Changed to true to show immediately
+    @State private var showDeviceSheet = false
     @State private var hasShownInitialSheet = false
     
     let circleButton1Options = ["Undo", "Redo", "Erase", "Brush Size (saved presets only)"]
@@ -17,30 +17,36 @@ struct ContentView: View {
     let dialOptions = ["Layers", "Pen Opacity", "Brush Size"]
     
     var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 20) {
-                    toolDropdown(icon: "circle.fill", title: "Circle Button 1", selection: $circleButton1, options: circleButton1Options)
-                    toolDropdown(icon: "circle.lefthalf.filled", title: "Circle Button 2", selection: $circleButton2, options: circleButton2Options)
-                    toolDropdown(icon: "gamecontroller.fill", title: "Buttons 1 + 2", selection: $buttons12, options: buttons12Options)
-                    toolDropdown(icon: "dial.medium.fill", title: "Dial", selection: $dial, options: dialOptions)
-                    
-                    if !bleManager.statusMessage.isEmpty {
-                        VStack(spacing: 8) {
-                            Image(systemName: bleManager.statusMessage.contains("") ? "xmark.circle.fill" : "checkmark.circle.fill")
-                                .font(.system(size: 32))
-                                .foregroundColor(bleManager.statusMessage.contains("") ? .red : .green)
-                            Text(bleManager.statusMessage).multilineTextAlignment(.center).padding()
+        NavigationStack {
+            ZStack {
+                // Background color
+                Color(red: 0.95, green: 0.95, blue: 0.97)
+                    .ignoresSafeArea()
+                
+                ScrollView {
+                    VStack(spacing: 20) {
+                        toolDropdown(icon: "circle.fill", title: "Circle Button 1", selection: $circleButton1, options: circleButton1Options)
+                        toolDropdown(icon: "circle.lefthalf.filled", title: "Circle Button 2", selection: $circleButton2, options: circleButton2Options)
+                        toolDropdown(icon: "gamecontroller.fill", title: "Buttons 1 + 2", selection: $buttons12, options: buttons12Options)
+                        toolDropdown(icon: "dial.medium.fill", title: "Dial", selection: $dial, options: dialOptions)
+                        
+                        if !bleManager.statusMessage.isEmpty {
+                            VStack(spacing: 8) {
+                                Image(systemName: bleManager.statusMessage.contains("") ? "xmark.circle.fill" : "checkmark.circle.fill")
+                                    .font(.system(size: 32))
+                                    .foregroundColor(bleManager.statusMessage.contains("") ? .red : .green)
+                                Text(bleManager.statusMessage).multilineTextAlignment(.center).padding()
+                            }
+                            .frame(maxWidth: .infinity)
+                            .background(RoundedRectangle(cornerRadius: 12).fill(bleManager.statusMessage.contains("") ? Color.red.opacity(0.1) : Color.green.opacity(0.1)))
+                            .padding(.horizontal)
                         }
-                        .frame(maxWidth: .infinity)
-                        .background(RoundedRectangle(cornerRadius: 12).fill(bleManager.statusMessage.contains("") ? Color.red.opacity(0.1) : Color.green.opacity(0.1)))
-                        .padding(.horizontal)
                     }
+                    .padding()
                 }
-                .padding()
             }
             .navigationTitle("eSketch Shortcuts")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button(action: { 
@@ -75,17 +81,22 @@ struct ContentView: View {
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
         }
-        .sheet(isPresented: $showDeviceSheet) { DeviceSelectionSheet(bleManager: bleManager, showDeviceSheet: $showDeviceSheet) }
+        .sheet(isPresented: $showDeviceSheet) { 
+            DeviceSelectionSheet(bleManager: bleManager, showDeviceSheet: $showDeviceSheet) 
+        }
         .onReceive(bleManager.$isConnected) { connected in 
             if connected { 
                 showDeviceSheet = false 
             }
         }
         .onAppear {
-            // Start scanning immediately when the view appears
+            // Automatically show device selection sheet on first launch
             if !hasShownInitialSheet && !bleManager.isConnected {
                 hasShownInitialSheet = true
-                bleManager.startScan()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    bleManager.startScan()
+                    showDeviceSheet = true
+                }
             }
         }
     }
