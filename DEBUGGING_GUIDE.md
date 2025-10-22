@@ -33,14 +33,33 @@
 - ✅ Read/write error messages
 - ✅ Console logging for developers
 
+### Issue 4: "Build input files cannot be found"
+**Problem**: Xcode project used relative paths that broke when cloning to different locations.
+
+**Fix**:
+- ✅ Changed `sourceTree` from `<group>` to `SOURCE_ROOT`
+- ✅ Files now referenced relative to project root
+- ✅ Works regardless of clone location
+- ✅ No more absolute path dependencies
+
 ---
 
 ## 📱 On Your Groupmate's Mac
 
-### Step 1: Pull Latest Changes
+### Step 1: Pull Latest Changes (IMPORTANT!)
 ```bash
 cd /Users/Belen/Downloads/procreatekey-app
 git pull origin app
+```
+
+**⚠️ CRITICAL**: If you get "Build input files cannot be found" error after pulling, do this:
+```bash
+# Delete and re-clone fresh
+cd /Users/Belen/Downloads
+rm -rf procreatekey-app
+git clone -b app https://github.com/AmyChoi11/procreatekey.git procreatekey-app
+cd procreatekey-app
+open ProcreateBLEConfig.xcodeproj
 ```
 
 ### Step 2: Clean and Rebuild
@@ -48,6 +67,12 @@ In Xcode:
 1. **Product** → **Clean Build Folder** (Shift+Cmd+K)
 2. **Product** → **Build** (Cmd+B)
 3. **Product** → **Run** (Cmd+R)
+
+**If still getting file path errors:**
+1. Close Xcode completely
+2. Delete derived data: `rm -rf ~/Library/Developer/Xcode/DerivedData/*`
+3. Reopen project
+4. Try building again
 
 ### Step 3: Test BLE Scanning
 
