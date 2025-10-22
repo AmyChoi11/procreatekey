@@ -6,6 +6,7 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
     @Published var isConnected: Bool = false
     @Published var statusMessage: String = ""
     @Published var isScanning: Bool = false
+    @Published var bluetoothState: CBManagerState = .unknown
     private var central: CBCentralManager!
     private var targetPeripheral: CBPeripheral?
     private let serviceUUID = CBUUID(string: "12345678-1234-5678-1234-56789abcdef0")
@@ -19,8 +20,23 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
     }
 
     func startScan() {
+        // Check if running in simulator
+        #if targetEnvironment(simulator)
+        statusMessage = "⚠️ Bluetooth is not available in iOS Simulator. Please test on a real device."
+        return
+        #endif
+        
         guard central.state == .poweredOn else {
-            statusMessage = "Bluetooth not ready. Please enable Bluetooth."
+            switch central.state {
+            case .poweredOff:
+                statusMessage = "⚠️ Bluetooth is turned off. Please enable Bluetooth in Settings."
+            case .unauthorized:
+                statusMessage = "⚠️ Bluetooth permission denied. Please enable in Settings."
+            case .unsupported:
+                statusMessage = "⚠️ Bluetooth is not supported on this device."
+            default:
+                statusMessage = "⚠️ Bluetooth not ready. Please wait or check Settings."
+            }
             return
         }
         
@@ -76,17 +92,24 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
 
     // MARK: CBCentralManagerDelegate
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
+        bluetoothState = central.state
+        
+        #if targetEnvironment(simulator)
+        statusMessage = "⚠️ Bluetooth not available in Simulator. Please test on a real device."
+        return
+        #endif
+        
         switch central.state {
         case .poweredOn:
             statusMessage = "Bluetooth ready"
         case .poweredOff:
-            statusMessage = "Please turn on Bluetooth"
+            statusMessage = "⚠️ Please turn on Bluetooth in Settings"
         case .unauthorized:
-            statusMessage = "Bluetooth permission denied"
+            statusMessage = "⚠️ Bluetooth permission denied. Check Settings."
         case .unsupported:
-            statusMessage = "Bluetooth not supported"
+            statusMessage = "⚠️ Bluetooth not supported on this device"
         default:
-            statusMessage = "Bluetooth not ready"
+            statusMessage = "Bluetooth initializing..."
         }
     }
 

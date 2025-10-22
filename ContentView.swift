@@ -25,6 +25,29 @@ struct ContentView: View {
                 
                 ScrollView {
                     VStack(spacing: 20) {
+                        // Simulator warning
+                        #if targetEnvironment(simulator)
+                        VStack(spacing: 12) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 40))
+                                .foregroundColor(.orange)
+                            Text("Simulator Limitation")
+                                .font(.headline)
+                                .foregroundColor(.orange)
+                            Text("Bluetooth is not supported in the iOS Simulator. Please build and run this app on a real iPad or iPhone to test Bluetooth functionality.")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                        }
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.orange.opacity(0.1))
+                        )
+                        .padding(.horizontal)
+                        #endif
+                        
                         toolDropdown(icon: "circle.fill", title: "Circle Button 1", selection: $circleButton1, options: circleButton1Options)
                         toolDropdown(icon: "circle.lefthalf.filled", title: "Circle Button 2", selection: $circleButton2, options: circleButton2Options)
                         toolDropdown(icon: "gamecontroller.fill", title: "Buttons 1 + 2", selection: $buttons12, options: buttons12Options)
@@ -32,13 +55,13 @@ struct ContentView: View {
                         
                         if !bleManager.statusMessage.isEmpty {
                             VStack(spacing: 8) {
-                                Image(systemName: bleManager.statusMessage.contains("") ? "xmark.circle.fill" : "checkmark.circle.fill")
+                                Image(systemName: bleManager.statusMessage.contains("⚠️") ? "exclamationmark.circle.fill" : "checkmark.circle.fill")
                                     .font(.system(size: 32))
-                                    .foregroundColor(bleManager.statusMessage.contains("") ? .red : .green)
+                                    .foregroundColor(bleManager.statusMessage.contains("⚠️") ? .orange : .green)
                                 Text(bleManager.statusMessage).multilineTextAlignment(.center).padding()
                             }
                             .frame(maxWidth: .infinity)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(bleManager.statusMessage.contains("") ? Color.red.opacity(0.1) : Color.green.opacity(0.1)))
+                            .background(RoundedRectangle(cornerRadius: 12).fill(bleManager.statusMessage.contains("⚠️") ? Color.orange.opacity(0.1) : Color.green.opacity(0.1)))
                             .padding(.horizontal)
                         }
                     }
@@ -55,7 +78,8 @@ struct ContentView: View {
                             showDeviceSheet = true 
                         } 
                     }) {
-                        Image(systemName: bleManager.isScanning ? "antenna.radiowaves.left.and.right" : "bluetooth")
+                        // Use alternative icon for simulator compatibility
+                        Image(systemName: bleManager.isScanning ? "antenna.radiowaves.left.and.right" : "wave.3.right")
                             .foregroundColor(.white)
                             .font(.system(size: 18))
                     }
