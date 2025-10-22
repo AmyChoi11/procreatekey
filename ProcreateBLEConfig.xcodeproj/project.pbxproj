@@ -13,10 +13,10 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		A1000002 /* ProcreateBLEConfigApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcreateBLEConfigApp.swift; sourceTree = "<group>"; };
-		A1000004 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		A1000006 /* BLEManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BLEManager.swift; sourceTree = "<group>"; };
-		A1000007 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A1000002 /* ProcreateBLEConfigApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcreateBLEConfigApp.swift; sourceTree = SOURCE_ROOT; };
+		A1000004 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = SOURCE_ROOT; };
+		A1000006 /* BLEManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BLEManager.swift; sourceTree = SOURCE_ROOT; };
+		A1000007 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = SOURCE_ROOT; };
 		A1000008 /* ProcreateBLEConfig.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ProcreateBLEConfig.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -39,6 +39,7 @@
 				A1000006 /* BLEManager.swift */,
 				A1000007 /* Info.plist */,
 			);
+			name = ProcreateBLEConfig;
 			sourceTree = "<group>";
 		};
 		A100000B = {
@@ -47,7 +48,7 @@
 				A100000A /* ProcreateBLEConfig */,
 				A100000C /* Products */,
 			);
-			sourceTree = "<group>";
+			sourceTree = SOURCE_ROOT;
 		};
 		A100000C /* Products */ = {
 			isa = PBXGroup;
