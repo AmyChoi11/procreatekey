@@ -116,13 +116,13 @@ struct ContentView: View {
         .onReceive(bleManager.$currentConfig) { newConfig in
             // Update UI when configuration is loaded from device
             if let button1Code = newConfig["button1"] {
-                circleButton1 = functionCodeToOption(button1Code)
+                circleButton1 = functionCodeToOptionForButton(button1Code, validOptions: circleButton1Options, defaultOption: "Undo")
             }
             if let button2Code = newConfig["button2"] {
-                circleButton2 = functionCodeToOption(button2Code)
+                circleButton2 = functionCodeToOptionForButton(button2Code, validOptions: circleButton2Options, defaultOption: "Undo")
             }
             if let button3Code = newConfig["button3"] {
-                buttons12 = functionCodeToOption(button3Code)
+                buttons12 = functionCodeToOptionForButton(button3Code, validOptions: buttons12Options, defaultOption: "Color Palette")
             }
         }
         .onAppear {
@@ -196,6 +196,18 @@ struct ContentView: View {
         case 10: return "Pen Opacity"
         case 11: return "Brush Size"
         default: return "Undo"
+        }
+    }
+    
+    func functionCodeToOptionForButton(_ code: Int, validOptions: [String], defaultOption: String) -> String {
+        let option = functionCodeToOption(code)
+        // Check if the decoded option is valid for this button
+        if validOptions.contains(option) {
+            return option
+        } else {
+            // If not valid, return the default for this button
+            print("⚠️ Invalid option '\(option)' for button with options: \(validOptions). Using default: \(defaultOption)")
+            return defaultOption
         }
     }
     
