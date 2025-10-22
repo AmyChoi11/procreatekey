@@ -32,43 +32,101 @@ struct ContentView: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
                 
-                Button(action: { 
-                    bleManager.startScan()
-                    showDevicePicker = true 
-                }) {
-                    HStack {
-                        Image(systemName: bleManager.isConnected ? "checkmark.circle.fill" : "antenna.radiowaves.left.and.right")
-                        Text(bleManager.isConnected ? "Connected" : "Scan for Devices")
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(bleManager.isConnected ? Color.green : Color.blue)
-                    .foregroundColor(.white)
-                    .cornerRadius(10)
-                }
-                .disabled(bleManager.isConnected)
-                .padding(.horizontal)
-                
-                if showDevicePicker && !bleManager.devices.isEmpty {
-                    VStack {
-                        Text("Select Device:")
-                            .font(.headline)
-                        List(bleManager.devices, id: \.identifier) { device in
-                            Button(action: {
-                                bleManager.connect(to: device)
-                                selectedDevice = device
-                                showDevicePicker = false
-                            }) {
-                                HStack {
-                                    Image(systemName: "dot.radiowaves.left.and.right")
-                                    Text(device.name ?? "Unknown Device")
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .foregroundColor(.gray)
-                                }
+                if !bleManager.isConnected {
+                    Button(action: { 
+                        bleManager.startScan()
+                        showDevicePicker = true 
+                    }) {
+                        HStack {
+                            if bleManager.isScanning {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                Text("Scanning...")
+                            } else {
+                                Image(systemName: "antenna.radiowaves.left.and.right")
+                                Text("Scan for Devices")
                             }
                         }
-                        .frame(maxHeight: 200)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                    }
+                    .disabled(bleManager.isScanning)
+                    .padding(.horizontal)
+                } else {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                        Text("Connected")
+                            .foregroundColor(.green)
+                            .bold()
+                        Spacer()
+                        Button("Disconnect") {
+                            bleManager.disconnect()
+                        }
+                        .foregroundColor(.red)
+                    }
+                    .padding()
+                    .background(Color.green.opacity(0.1))
+                    .cornerRadius(10)
+                    .padding(.horizontal)
+                }
+                
+                if showDevicePicker {
+                    VStack {
+                        HStack {
+                            Text("Available Devices (\(bleManager.devices.count))")
+                                .font(.headline)
+                            Spacer()
+                            if bleManager.isScanning {
+                                ProgressView()
+                            } else {
+                                Button("Scan Again") {
+                                    bleManager.startScan()
+                                }
+                                .font(.caption)
+                            }
+                        }
+                        .padding(.horizontal)
+                        
+                        if bleManager.devices.isEmpty {
+                            VStack(spacing: 10) {
+                                Image(systemName: "wifi.slash")
+                                    .font(.largeTitle)
+                                    .foregroundColor(.gray)
+                                Text("No devices found")
+                                    .foregroundColor(.gray)
+                                Text("Make sure ESP32 is powered on")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                            .frame(height: 150)
+                        } else {
+                            List(bleManager.devices, id: \.identifier) { device in
+                                Button(action: {
+                                    bleManager.connect(to: device)
+                                    selectedDevice = device
+                                    showDevicePicker = false
+                                }) {
+                                    HStack {
+                                        VStack(alignment: .leading) {
+                                            Text(device.name ?? "Unknown Device")
+                                                .font(.headline)
+                                            Text(device.identifier.uuidString)
+                                                .font(.caption)
+                                                .foregroundColor(.gray)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "chevron.right")
+                                            .foregroundColor(.gray)
+                                    }
+                                    .padding(.vertical, 4)
+                                }
+                            }
+                            .frame(maxHeight: 250)
+                        }
                     }
                 }
                 
