@@ -89,12 +89,12 @@ struct ContentView: View {
                     HStack(spacing: 16) {
                         if bleManager.isConnected {
                             Button(action: { bleManager.disconnect() }) { 
-                                Image(systemName: "link.slash")
+                                Image(systemName: "xmark.circle")
                                     .foregroundColor(.white)
                             }
                         }
                         Button(action: { saveConfiguration() }) { 
-                            Image(systemName: "square.and.arrow.down")
+                            Image(systemName: "arrow.down.circle")
                                 .foregroundColor(.white)
                         }
                         .disabled(!bleManager.isConnected)
@@ -133,6 +133,11 @@ struct ContentView: View {
                 print("  Buttons 1+2: code \(button3Code) → '\(option)'")
                 buttons12 = option
             }
+            if let dialCode = newConfig["dial"] {
+                let option = functionCodeToOptionForButton(dialCode, validOptions: dialOptions, defaultOption: "Layers")
+                print("  Dial: code \(dialCode) → '\(option)'")
+                dial = option
+            }
         }
         .onAppear {
             // Automatically show device selection sheet on first launch
@@ -155,7 +160,10 @@ struct ContentView: View {
             }
             Menu {
                 ForEach(options, id: \.self) { option in
-                    Button(action: { selection.wrappedValue = option; if bleManager.isConnected { saveConfiguration() } }) {
+                    Button(action: { 
+                        selection.wrappedValue = option
+                        // Removed auto-save - user must press the save button explicitly
+                    }) {
                         HStack { Text(option); if selection.wrappedValue == option { Image(systemName: "checkmark") } }
                     }
                 }
@@ -225,12 +233,14 @@ struct ContentView: View {
         config["button1"] = optionToFunctionCode(circleButton1)
         config["button2"] = optionToFunctionCode(circleButton2)
         config["button3"] = optionToFunctionCode(buttons12)
+        config["dial"] = optionToFunctionCode(dial)
         
         // Debug logging
         print("📤 Saving configuration:")
         print("  Circle Button 1: '\(circleButton1)' → code \(config["button1"] ?? 0)")
         print("  Circle Button 2: '\(circleButton2)' → code \(config["button2"] ?? 0)")
         print("  Buttons 1+2: '\(buttons12)' → code \(config["button3"] ?? 0)")
+        print("  Dial: '\(dial)' → code \(config["dial"] ?? 0)")
         print("  Full config: \(config)")
         
         bleManager.writeConfig(config: config)
