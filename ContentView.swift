@@ -115,14 +115,23 @@ struct ContentView: View {
         }
         .onReceive(bleManager.$currentConfig) { newConfig in
             // Update UI when configuration is loaded from device
+            print("📥 Loading configuration from device:")
+            print("  Raw config: \(newConfig)")
+            
             if let button1Code = newConfig["button1"] {
-                circleButton1 = functionCodeToOptionForButton(button1Code, validOptions: circleButton1Options, defaultOption: "Undo")
+                let option = functionCodeToOptionForButton(button1Code, validOptions: circleButton1Options, defaultOption: "Undo")
+                print("  Circle Button 1: code \(button1Code) → '\(option)'")
+                circleButton1 = option
             }
             if let button2Code = newConfig["button2"] {
-                circleButton2 = functionCodeToOptionForButton(button2Code, validOptions: circleButton2Options, defaultOption: "Undo")
+                let option = functionCodeToOptionForButton(button2Code, validOptions: circleButton2Options, defaultOption: "Undo")
+                print("  Circle Button 2: code \(button2Code) → '\(option)'")
+                circleButton2 = option
             }
             if let button3Code = newConfig["button3"] {
-                buttons12 = functionCodeToOptionForButton(button3Code, validOptions: buttons12Options, defaultOption: "Color Palette")
+                let option = functionCodeToOptionForButton(button3Code, validOptions: buttons12Options, defaultOption: "Color Palette")
+                print("  Buttons 1+2: code \(button3Code) → '\(option)'")
+                buttons12 = option
             }
         }
         .onAppear {
@@ -216,6 +225,14 @@ struct ContentView: View {
         config["button1"] = optionToFunctionCode(circleButton1)
         config["button2"] = optionToFunctionCode(circleButton2)
         config["button3"] = optionToFunctionCode(buttons12)
+        
+        // Debug logging
+        print("📤 Saving configuration:")
+        print("  Circle Button 1: '\(circleButton1)' → code \(config["button1"] ?? 0)")
+        print("  Circle Button 2: '\(circleButton2)' → code \(config["button2"] ?? 0)")
+        print("  Buttons 1+2: '\(buttons12)' → code \(config["button3"] ?? 0)")
+        print("  Full config: \(config)")
+        
         bleManager.writeConfig(config: config)
     }
 }

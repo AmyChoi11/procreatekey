@@ -1,0 +1,184 @@
+import SwiftUI
+import CoreBluetooth
+
+struct ContentView: View {
+    @StateObject private var bleManager = BLEManager()
+    @State private var selectedDevice: CBPeripheral?
+    @State private var showDevicePicker = false
+    @State private var config: [String: Int] = ["button1": 4, "button2": 1, "button3": 3]
+
+    let actions = ["Left Click", "Right Click", "Double Click", "Undo", "Redo"]
+    
+    // Map action index to function code
+    func actionToCode(_ index: Int) -> Int {
+        return index // 0=Left, 1=Right, 2=Double, 3=Undo, 4=Redo
+    }
+    
+    // Map function code to action index
+    func codeToAction(_ code: Int) -> Int {
+        return code
+    }
+
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 24) {
+                Text("Procreate BLE Config")
+                    .font(.largeTitle)
+                    .bold()
+                    .padding(.top)
+                
+                Text(bleManager.statusMessage)
+                    .foregroundColor(.gray)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+                
+                if !bleManager.isConnected {
+                    Button(action: { 
+                        bleManager.startScan()
+                        showDevicePicker = true 
+                    }) {
+                        HStack {
+                            if bleManager.isScanning {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                Text("Scanning...")
+                            } else {
+                                Image(systemName: "antenna.radiowaves.left.and.right")
+                                Text("Scan for Devices")
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                    }
+                    .disabled(bleManager.isScanning)
+                    .padding(.horizontal)
+                } else {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                        Text("Connected")
+                            .foregroundColor(.green)
+                            .bold()
+                        Spacer()
+                        Button("Disconnect") {
+                            bleManager.disconnect()
+                        }
+                        .foregroundColor(.red)
+                    }
+                    .padding()
+                    .background(Color.green.opacity(0.1))
+                    .cornerRadius(10)
+                    .padding(.horizontal)
+                }
+                
+                if showDevicePicker {
+                    VStack {
+                        HStack {
+                            Text("Available Devices (\(bleManager.devices.count))")
+                                .font(.headline)
+                            Spacer()
+                            if bleManager.isScanning {
+                                ProgressView()
+                            } else {
+                                Button("Scan Again") {
+                                    bleManager.startScan()
+                                }
+                                .font(.caption)
+                            }
+                        }
+                        .padding(.horizontal)
+                        
+                        if bleManager.devices.isEmpty {
+                            VStack(spacing: 10) {
+                                Image(systemName: "wifi.slash")
+                                    .font(.largeTitle)
+                                    .foregroundColor(.gray)
+                                Text("No devices found")
+                                    .foregroundColor(.gray)
+                                Text("Make sure ESP32 is powered on")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                            .frame(height: 150)
+                        } else {
+                            List(bleManager.devices, id: \.identifier) { device in
+                                Button(action: {
+                                    bleManager.connect(to: device)
+                                    selectedDevice = device
+                                    showDevicePicker = false
+                                }) {
+                                    HStack {
+                                        VStack(alignment: .leading) {
+                                            Text(device.name ?? "Unknown Device")
+                                                .font(.headline)
+                                            Text(device.identifier.uuidString)
+                                                .font(.caption)
+                                                .foregroundColor(.gray)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "chevron.right")
+                                            .foregroundColor(.gray)
+                                    }
+                                    .padding(.vertical, 4)
+                                }
+                            }
+                            .frame(maxHeight: 250)
+                        }
+                    }
+                }
+                
+                if bleManager.isConnected {
+                    VStack(spacing: 16) {
+                        Text("Button Configuration")
+                            .font(.headline)
+                        
+                        Form {
+                            ForEach(["button1", "button2", "button3"], id: \.self) { key in
+                                Picker(key.replacingOccurrences(of: "button", with: "Button "), selection: Binding(
+                                    get: { codeToAction(config[key] ?? 0) },
+                                    set: { config[key] = actionToCode($0) }
+                                )) {
+                                    ForEach(0..<actions.count, id: \.self) { i in
+                                        Text(actions[i]).tag(i)
+                                    }
+                                }
+                                .pickerStyle(MenuPickerStyle())
+                            }
+                        }
+                        .frame(height: 200)
+                        
+                        Button(action: {
+                            bleManager.writeConfig(config: config)
+                        }) {
+                            HStack {
+                                Image(systemName: "square.and.arrow.down")
+                                Text("Save Configuration")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.orange)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                        }
+                        .padding(.horizontal)
+                    }
+                }
+                
+                Spacer()
+            }
+            .padding()
+            .onReceive(bleManager.$isConnected) { connected in
+                if !connected {
+                    showDevicePicker = false
+                }
+            }
+            .onReceive(bleManager.$currentConfig) { newConfig in
+                // Update local config when device config is read
+                self.config = newConfig
+            }
+        }
+    }
+}

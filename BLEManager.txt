@@ -5,9 +5,8 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
     @Published var devices: [CBPeripheral] = []
     @Published var isConnected: Bool = false
     @Published var statusMessage: String = ""
+    @Published var currentConfig: [String: Int] = ["button1": 4, "button2": 1, "button3": 3]
     @Published var isScanning: Bool = false
-    @Published var bluetoothState: CBManagerState = .unknown
-    @Published var currentConfig: [String: Int] = ["button1": 3, "button2": 3, "button3": 0]
     private var central: CBCentralManager!
     private var targetPeripheral: CBPeripheral?
     private let serviceUUID = CBUUID(string: "12345678-1234-5678-1234-56789abcdef0")
@@ -21,23 +20,8 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
     }
 
     func startScan() {
-        // Check if running in simulator
-        #if targetEnvironment(simulator)
-        statusMessage = "⚠️ Bluetooth is not available in iOS Simulator. Please test on a real device."
-        return
-        #endif
-        
         guard central.state == .poweredOn else {
-            switch central.state {
-            case .poweredOff:
-                statusMessage = "⚠️ Bluetooth is turned off. Please enable Bluetooth in Settings."
-            case .unauthorized:
-                statusMessage = "⚠️ Bluetooth permission denied. Please enable in Settings."
-            case .unsupported:
-                statusMessage = "⚠️ Bluetooth is not supported on this device."
-            default:
-                statusMessage = "⚠️ Bluetooth not ready. Please wait or check Settings."
-            }
+            statusMessage = "Bluetooth not ready. Please enable Bluetooth."
             return
         }
         
@@ -86,8 +70,6 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
         guard let char = configChar, let peripheral = targetPeripheral else { return }
         let json = try? JSONSerialization.data(withJSONObject: ["buttons": config], options: [])
         if let json = json {
-            print("📤 Writing config to ESP32:")
-            print("  JSON String: \(String(data: json, encoding: .utf8) ?? "invalid")")
             peripheral.writeValue(json, for: char, type: .withResponse)
             statusMessage = "Config sent!"
         }
@@ -95,24 +77,17 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
 
     // MARK: CBCentralManagerDelegate
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
-        bluetoothState = central.state
-        
-        #if targetEnvironment(simulator)
-        statusMessage = "⚠️ Bluetooth not available in Simulator. Please test on a real device."
-        return
-        #endif
-        
         switch central.state {
         case .poweredOn:
             statusMessage = "Bluetooth ready"
         case .poweredOff:
-            statusMessage = "⚠️ Please turn on Bluetooth in Settings"
+            statusMessage = "Please turn on Bluetooth"
         case .unauthorized:
-            statusMessage = "⚠️ Bluetooth permission denied. Check Settings."
+            statusMessage = "Bluetooth permission denied"
         case .unsupported:
-            statusMessage = "⚠️ Bluetooth not supported on this device"
+            statusMessage = "Bluetooth not supported"
         default:
-            statusMessage = "Bluetooth initializing..."
+            statusMessage = "Bluetooth not ready"
         }
     }
 
