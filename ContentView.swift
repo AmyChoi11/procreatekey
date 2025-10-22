@@ -9,6 +9,7 @@ struct ContentView: View {
     @State private var buttons12: String = "Color Palette"
     @State private var dial: String = "Layers"
     @State private var showDeviceSheet = false
+    @State private var hasShownInitialSheet = false
     
     let circleButton1Options = ["Undo", "Redo", "Erase", "Brush Size (saved presets only)"]
     let circleButton2Options = ["Undo", "Redo", "Erase", "Brush Size (saved presets only)"]
@@ -42,17 +43,32 @@ struct ContentView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: { if !bleManager.isScanning { bleManager.startScan(); showDeviceSheet = true } }) {
-                        Image(systemName: bleManager.isScanning ? "antenna.radiowaves.left.and.right" : "bluetooth").foregroundColor(.white)
-                    }.disabled(bleManager.isScanning)
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    if bleManager.isConnected {
-                        Button(action: { bleManager.disconnect() }) { Image(systemName: "link.slash").foregroundColor(.white) }
+                    Button(action: { 
+                        if !bleManager.isScanning { 
+                            bleManager.startScan()
+                            showDeviceSheet = true 
+                        } 
+                    }) {
+                        Image(systemName: bleManager.isScanning ? "antenna.radiowaves.left.and.right" : "bluetooth")
+                            .foregroundColor(.white)
+                            .font(.system(size: 18))
                     }
+                    .disabled(bleManager.isScanning)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { saveConfiguration() }) { Image(systemName: "square.and.arrow.down").foregroundColor(.white) }.disabled(!bleManager.isConnected)
+                    HStack(spacing: 16) {
+                        if bleManager.isConnected {
+                            Button(action: { bleManager.disconnect() }) { 
+                                Image(systemName: "link.slash")
+                                    .foregroundColor(.white)
+                            }
+                        }
+                        Button(action: { saveConfiguration() }) { 
+                            Image(systemName: "square.and.arrow.down")
+                                .foregroundColor(.white)
+                        }
+                        .disabled(!bleManager.isConnected)
+                    }
                 }
             }
             .toolbarBackground(Color(red: 0.4, green: 0.2, blue: 0.6), for: .navigationBar)
@@ -61,6 +77,15 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showDeviceSheet) { DeviceSelectionSheet(bleManager: bleManager, showDeviceSheet: $showDeviceSheet) }
         .onReceive(bleManager.$isConnected) { connected in if connected { showDeviceSheet = false } }
+        .onAppear {
+            if !hasShownInitialSheet && !bleManager.isConnected {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    bleManager.startScan()
+                    showDeviceSheet = true
+                    hasShownInitialSheet = true
+                }
+            }
+        }
     }
     
     @ViewBuilder
