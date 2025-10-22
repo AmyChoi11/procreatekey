@@ -39,7 +39,6 @@
 				A1000006 /* BLEManager.swift */,
 				A1000007 /* Info.plist */,
 			);
-			path = ProcreateBLEConfig;
 			sourceTree = "<group>";
 		};
 		A100000B = {
