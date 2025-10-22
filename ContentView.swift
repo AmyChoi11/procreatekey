@@ -113,6 +113,18 @@ struct ContentView: View {
                 showDeviceSheet = false 
             }
         }
+        .onReceive(bleManager.$currentConfig) { newConfig in
+            // Update UI when configuration is loaded from device
+            if let button1Code = newConfig["button1"] {
+                circleButton1 = functionCodeToOption(button1Code)
+            }
+            if let button2Code = newConfig["button2"] {
+                circleButton2 = functionCodeToOption(button2Code)
+            }
+            if let button3Code = newConfig["button3"] {
+                buttons12 = functionCodeToOption(button3Code)
+            }
+        }
         .onAppear {
             // Automatically show device selection sheet on first launch
             if !hasShownInitialSheet && !bleManager.isConnected {
@@ -153,7 +165,7 @@ struct ContentView: View {
     }
     
     func getToolColor(for option: String) -> Color {
-        if option == "Undo" || option == "Erase" { return Color(red: 1.0, green: 0.76, blue: 0.8) }
+        // All options use the same neutral gray color
         return Color.gray.opacity(0.2)
     }
     
@@ -161,8 +173,29 @@ struct ContentView: View {
         switch option {
         case "Undo": return 3
         case "Redo": return 4
-        case "Erase", "Brush Size (saved presets only)", "Color Palette", "Brush Library", "Layers", "Pen Opacity", "Brush Size": return 0
+        case "Erase": return 5
+        case "Brush Size (saved presets only)": return 6
+        case "Color Palette": return 7
+        case "Brush Library": return 8
+        case "Layers": return 9
+        case "Pen Opacity": return 10
+        case "Brush Size": return 11
         default: return 0
+        }
+    }
+    
+    func functionCodeToOption(_ code: Int) -> String {
+        switch code {
+        case 3: return "Undo"
+        case 4: return "Redo"
+        case 5: return "Erase"
+        case 6: return "Brush Size (saved presets only)"
+        case 7: return "Color Palette"
+        case 8: return "Brush Library"
+        case 9: return "Layers"
+        case 10: return "Pen Opacity"
+        case 11: return "Brush Size"
+        default: return "Undo"
         }
     }
     

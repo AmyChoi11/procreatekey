@@ -7,6 +7,7 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
     @Published var statusMessage: String = ""
     @Published var isScanning: Bool = false
     @Published var bluetoothState: CBManagerState = .unknown
+    @Published var currentConfig: [String: Int] = ["button1": 3, "button2": 3, "button3": 0]
     private var central: CBCentralManager!
     private var targetPeripheral: CBPeripheral?
     private let serviceUUID = CBUUID(string: "12345678-1234-5678-1234-56789abcdef0")
@@ -209,6 +210,7 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
                 if let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
                    let buttons = json["buttons"] as? [String: Int] {
                     DispatchQueue.main.async {
+                        self.currentConfig = buttons
                         self.statusMessage = "✓ Config loaded from device!"
                         print("✓ Parsed config: \(buttons)")
                     }
