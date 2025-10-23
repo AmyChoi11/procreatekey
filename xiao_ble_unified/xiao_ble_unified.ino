@@ -34,8 +34,8 @@
 #include <HIDTypes.h>
 
 // ============= Pin Definitions =============
-#define BUTTON1_PIN 1
-#define BUTTON2_PIN 3
+#define BUTTON1_PIN 4
+#define BUTTON2_PIN 5
 #define ENCODER_A   7
 #define ENCODER_B   6
 #define RESET_BTN   15
@@ -68,7 +68,7 @@ const unsigned long ENCODER_DEBOUNCE = 5;
 struct ButtonConfig {
   int button1 = 3;  // Default: Undo
   int button2 = 3;  // Default: Undo
-  int button3 = 7;  // Default: Color Palette
+  int combo = 7;    // Default: Color Palette (button1+button2 together)
   int dial = 9;     // Default: Brush Size 10%
 } config;
 
@@ -148,7 +148,9 @@ class ConfigCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic* pChar) {
     std::string value = pChar->getValue();
     if (value.length() > 0) {
-      Serial.println("📥 Received config:");
+      Serial.println("\n========================================");
+      Serial.println("📥 RECEIVED CONFIG FROM iOS APP");
+      Serial.println("========================================");
       Serial.println(value.c_str());
       
       DynamicJsonDocument doc(512);
@@ -165,27 +167,31 @@ class ConfigCallbacks : public BLECharacteristicCallbacks {
         
         config.button1 = buttons["button1"].as<int>();
         config.button2 = buttons["button2"].as<int>();
-        config.button3 = buttons["button3"].as<int>();
+        config.combo = buttons["combo"].as<int>();
         config.dial = buttons["dial"].as<int>();
         
         config.button1 = constrain(config.button1, 0, 11);
         config.button2 = constrain(config.button2, 0, 11);
-        config.button3 = constrain(config.button3, 0, 11);
+        config.combo = constrain(config.combo, 0, 11);
         config.dial = constrain(config.dial, 0, 11);
         
         prefs.begin("config", false);
         prefs.putInt("button1", config.button1);
         prefs.putInt("button2", config.button2);
-        prefs.putInt("button3", config.button3);
+        prefs.putInt("combo", config.combo);
         prefs.putInt("dial", config.dial);
         prefs.putBool("configured", true);  // Mark as configured
         prefs.end();
         
-        Serial.printf("✓ Config saved: B1=%d B2=%d B3=%d Dial=%d\n",
-                     config.button1, config.button2, config.button3, config.dial);
+        Serial.printf("\n✓✓✓ CONFIG SAVED TO FLASH ✓✓✓\n");
+        Serial.printf("  Button 1: %d\n", config.button1);
+        Serial.printf("  Button 2: %d\n", config.button2);
+        Serial.printf("  Combo (1+2): %d\n", config.combo);
+        Serial.printf("  Dial: %d\n", config.dial);
+        Serial.println("========================================\n");
         
         // Blink LED to confirm
-        for(int i=0; i<3; i++) {
+        for(int i=0; i<5; i++) {
           digitalWrite(LED_PIN, HIGH);
           delay(100);
           digitalWrite(LED_PIN, LOW);
@@ -193,10 +199,14 @@ class ConfigCallbacks : public BLECharacteristicCallbacks {
         }
         
         // Switch to keyboard mode after 2 seconds
-        Serial.println("→ Switching to Keyboard Mode in 2 seconds...");
+        Serial.println("→→→ SWITCHING TO KEYBOARD MODE IN 2 SECONDS...\n");
         delay(2000);
         switchToKeyboardMode();
+      } else {
+        Serial.println("⚠️ No 'buttons' key in JSON");
       }
+    } else {
+      Serial.println("⚠️ Received empty config write");
     }
   }
   
@@ -205,7 +215,7 @@ class ConfigCallbacks : public BLECharacteristicCallbacks {
     JsonObject buttons = doc.createNestedObject("buttons");
     buttons["button1"] = config.button1;
     buttons["button2"] = config.button2;
-    buttons["button3"] = config.button3;
+    buttons["combo"] = config.combo;
     buttons["dial"] = config.dial;
     
     String output;
@@ -507,7 +517,7 @@ void setup() {
   prefs.begin("config", true);
   config.button1 = prefs.getInt("button1", 3);
   config.button2 = prefs.getInt("button2", 3);
-  config.button3 = prefs.getInt("button3", 7);
+  config.combo = prefs.getInt("combo", 7);
   config.dial = prefs.getInt("dial", 9);
   isFirstBoot = !prefs.getBool("configured", false);  // Check if configured before
   prefs.end();
@@ -515,7 +525,7 @@ void setup() {
   Serial.printf("Loaded config:\n");
   Serial.printf("  Button 1: %d\n", config.button1);
   Serial.printf("  Button 2: %d\n", config.button2);
-  Serial.printf("  Button 1+2: %d\n", config.button3);
+  Serial.printf("  Button 1+2 Combo: %d\n", config.combo);
   Serial.printf("  Dial: %d\n", config.dial);
   Serial.printf("First boot: %s\n\n", isFirstBoot ? "YES (will show config mode)" : "NO (going straight to keyboard mode)");
   
@@ -617,7 +627,7 @@ void loop() {
     if (bothPressed && !button3Pressed) {
       Serial.println("🔘 BUTTON 1+2 COMBO PRESSED");
       button3Pressed = true;
-      sendFunctionKey(config.button3);
+      sendFunctionKey(config.combo);
       digitalWrite(LED_PIN, HIGH);
       delay(50);
       digitalWrite(LED_PIN, LOW);

@@ -7,7 +7,7 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
     @Published var statusMessage: String = ""
     @Published var isScanning: Bool = false
     @Published var bluetoothState: CBManagerState = .unknown
-    @Published var currentConfig: [String: Int] = ["button1": 3, "button2": 3, "button3": 0]
+    @Published var currentConfig: [String: Int] = ["button1": 3, "button2": 3, "combo": 7, "dial": 9]
     private var central: CBCentralManager!
     private var targetPeripheral: CBPeripheral?
     private let serviceUUID = CBUUID(string: "12345678-1234-5678-1234-56789abcdef0")
@@ -83,13 +83,27 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
     }
 
     func writeConfig(config: [String: Int]) {
-        guard let char = configChar, let peripheral = targetPeripheral else { return }
+        guard let char = configChar, let peripheral = targetPeripheral else {
+            print("❌ Cannot write: characteristic or peripheral not available")
+            statusMessage = "⚠️ Not connected to device"
+            return
+        }
+        
         let json = try? JSONSerialization.data(withJSONObject: ["buttons": config], options: [])
         if let json = json {
-            print("📤 Writing config to ESP32:")
-            print("  JSON String: \(String(data: json, encoding: .utf8) ?? "invalid")")
+            let jsonString = String(data: json, encoding: .utf8) ?? "invalid"
+            print("\n========================================")
+            print("📤 WRITING CONFIG TO ESP32")
+            print("========================================")
+            print("JSON: \(jsonString)")
+            print("Config dict: \(config)")
+            print("========================================\n")
+            
             peripheral.writeValue(json, for: char, type: .withResponse)
-            statusMessage = "Config sent!"
+            statusMessage = "Sending config..."
+        } else {
+            print("❌ Failed to serialize JSON")
+            statusMessage = "⚠️ Failed to create config"
         }
     }
 
@@ -189,12 +203,16 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
         print("🔍 Service \(service.uuid) has \(chars.count) characteristics:")
         for char in chars {
             print("  - Characteristic: \(char.uuid)")
+            print("    Properties: \(char.properties)")
             if char.uuid == configCharUUID {
                 configChar = char
                 statusMessage = "✓ Ready to configure!"
                 print("✓ Found config characteristic!")
-                // Read current config from ESP32
-                peripheral.readValue(for: char)
+                // Wait a moment before reading to ensure device is ready
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    print("📖 Reading current config from ESP32...")
+                    peripheral.readValue(for: char)
+                }
             }
         }
     }

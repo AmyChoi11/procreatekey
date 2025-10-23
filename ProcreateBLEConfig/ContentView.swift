@@ -4,8 +4,9 @@ import CoreBluetooth
 struct ContentView: View {
     @StateObject private var bleManager = BLEManager()
     
-    // Store configuration as numeric codes, just like the working version
-    @State private var config: [String: Int] = ["button1": 3, "button2": 3, "button3": 7, "dial": 9]
+    // Store configuration as numeric codes
+    // Note: "combo" refers to button1+2 pressed together
+    @State private var config: [String: Int] = ["button1": 3, "button2": 3, "combo": 7, "dial": 9]
     @State private var showDeviceSheet = false
     @State private var hasShownInitialSheet = false
     
@@ -61,7 +62,7 @@ struct ContentView: View {
                         toolDropdown(
                             icon: "gamecontroller.fill", 
                             title: "Buttons 1 + 2", 
-                            configKey: "button3",
+                            configKey: "combo",
                             options: buttons12Options
                         )
                         toolDropdown(
