@@ -60,7 +60,7 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
         isScanning = false
         scanTimer?.invalidate()
         if devices.isEmpty {
-            statusMessage = "No devices found. Make sure ESP32 is powered on."
+            statusMessage = "No 'XIAO_Config' found.\n\n💡 Make sure device is in CONFIG MODE:\n- First boot: automatic\n- Otherwise: Hold RESET button 5 seconds"
         } else {
             statusMessage = "Found \(devices.count) device(s). Tap to connect."
         }
@@ -134,9 +134,16 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
         // Filter out devices with very weak signal
         guard RSSI.intValue > -90 else { return }
         
+        // Only show XIAO_Config devices (in config mode)
+        let deviceName = peripheral.name ?? "Unknown"
+        guard deviceName == "XIAO_Config" else {
+            // Silently ignore other devices including "XIAO Keyboard"
+            return
+        }
+        
         // Only add if not already in list
         if !devices.contains(where: { $0.identifier == peripheral.identifier }) {
-            print("📱 Found device: \(peripheral.name ?? "Unknown") - RSSI: \(RSSI)")
+            print("📱 Found config device: \(deviceName) - RSSI: \(RSSI)")
             devices.append(peripheral)
             statusMessage = "Found \(devices.count) device(s)..."
         }
@@ -182,12 +189,21 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
         for service in services {
             print("  - Service: \(service.uuid)")
             if service.uuid == serviceUUID {
+                print("  ✓ Found our config service!")
                 statusMessage = "Found config service! Discovering characteristics..."
                 peripheral.discoverCharacteristics(nil, for: service)
             } else {
-                // Also try to discover characteristics for other services
+                // Also discover characteristics for debugging
                 peripheral.discoverCharacteristics(nil, for: service)
             }
+        }
+        
+        // Check if our service was NOT found
+        if !services.contains(where: { $0.uuid == serviceUUID }) {
+            statusMessage = "⚠️ Device is in KEYBOARD mode. Hold RESET button 5 seconds to enter CONFIG mode."
+            print("❌ Config service NOT found! Device might be in KEYBOARD mode.")
+            print("   Expected service UUID: \(serviceUUID)")
+            print("   💡 Hold the RESET button for 5 seconds to enter CONFIG mode")
         }
     }
 

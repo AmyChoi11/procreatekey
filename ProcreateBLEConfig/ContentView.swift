@@ -247,15 +247,32 @@ struct DeviceSelectionSheet: View {
                 if bleManager.isScanning {
                     VStack(spacing: 20) {
                         ProgressView().scaleEffect(1.5)
-                        Text("Scanning for devices...").font(.headline)
-                        Text("Make sure your ESP32 is powered on").font(.caption).foregroundColor(.gray)
-                    }.frame(maxHeight: .infinity)
+                        Text("Scanning for XIAO_Config...").font(.headline)
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Device must be in CONFIG MODE:").font(.caption).foregroundColor(.gray).bold()
+                            Text("• First boot: Automatic").font(.caption).foregroundColor(.gray)
+                            Text("• Otherwise: Hold RESET 5 seconds").font(.caption).foregroundColor(.gray)
+                        }
+                        .padding()
+                        .background(Color.orange.opacity(0.1))
+                        .cornerRadius(8)
+                    }.frame(maxHeight: .infinity).padding()
                 } else if bleManager.devices.isEmpty {
                     VStack(spacing: 20) {
-                        Image(systemName: "magnifyingglass").font(.system(size: 50)).foregroundColor(.gray)
-                        Text("No devices found").font(.headline)
-                        Button("Scan Again") { bleManager.startScan() }.buttonStyle(.bordered)
-                    }.frame(maxHeight: .infinity)
+                        Image(systemName: "exclamationmark.triangle").font(.system(size: 50)).foregroundColor(.orange)
+                        Text("No XIAO_Config Found").font(.headline)
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("To enter CONFIG MODE:").font(.subheadline).bold()
+                            Text("1️⃣ First boot: Device starts in CONFIG mode automatically").font(.caption)
+                            Text("2️⃣ After configuration: Hold RESET button for 5 seconds").font(.caption)
+                            Text("3️⃣ LED will flash rapidly 10 times").font(.caption)
+                            Text("4️⃣ Device shows as 'XIAO_Config'").font(.caption)
+                        }
+                        .padding()
+                        .background(Color.orange.opacity(0.1))
+                        .cornerRadius(8)
+                        Button("Scan Again") { bleManager.startScan() }.buttonStyle(.borderedProminent).tint(.orange)
+                    }.frame(maxHeight: .infinity).padding()
                 } else {
                     List(bleManager.devices, id: \.identifier) { device in
                         Button(action: { bleManager.connect(to: device); showDeviceSheet = false }) {
