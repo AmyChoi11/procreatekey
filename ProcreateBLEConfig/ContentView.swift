@@ -72,6 +72,21 @@ struct ContentView: View {
                             options: dialOptions
                         )
                         
+                        if bleManager.isConnected {
+                            VStack(spacing: 8) {
+                                Image(systemName: "info.circle.fill")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(.blue)
+                                Text("⚠️ While connected, do NOT press the RESET button on the device. It will disconnect and restart.")
+                                    .font(.caption)
+                                    .multilineTextAlignment(.center)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding()
+                            .background(RoundedRectangle(cornerRadius: 12).fill(Color.blue.opacity(0.1)))
+                            .padding(.horizontal)
+                        }
+                        
                         if !bleManager.statusMessage.isEmpty {
                             VStack(spacing: 8) {
                                 Image(systemName: bleManager.statusMessage.contains("⚠️") ? "exclamationmark.circle.fill" : "checkmark.circle.fill")

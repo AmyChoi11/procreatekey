@@ -164,12 +164,22 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
     
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
         isConnected = false
+        configChar = nil  // Clear the characteristic
         if let error = error {
-            statusMessage = "Disconnected with error: \(error.localizedDescription)"
+            let errorMessage = error.localizedDescription
+            print("🔌 Disconnected with error: \(errorMessage)")
+            
+            // Check if it's a timeout (common when device restarts)
+            if errorMessage.contains("timed out") || errorMessage.contains("time out") {
+                statusMessage = "Disconnected (device may have restarted)"
+                print("💡 This is normal if device is restarting into CONFIG mode")
+            } else {
+                statusMessage = "Disconnected: \(errorMessage)"
+            }
         } else {
             statusMessage = "Disconnected"
+            print("🔌 Disconnected from: \(peripheral.name ?? "Unknown")")
         }
-        print("🔌 Disconnected from: \(peripheral.name ?? "Unknown")")
     }
 
     // MARK: CBPeripheralDelegate
@@ -186,10 +196,15 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
         }
         
         print("🔍 Found \(services.count) services:")
+        var foundConfigService = false
         for service in services {
-            print("  - Service: \(service.uuid)")
-            if service.uuid == serviceUUID {
-                print("  ✓ Found our config service!")
+            let serviceUUIDString = service.uuid.uuidString
+            print("  - Service UUID: \(serviceUUIDString)")
+            
+            // Compare UUIDs (case-insensitive)
+            if serviceUUIDString.uppercased() == serviceUUID.uuidString.uppercased() {
+                print("  ✓✓✓ FOUND OUR CONFIG SERVICE! ✓✓✓")
+                foundConfigService = true
                 statusMessage = "Found config service! Discovering characteristics..."
                 peripheral.discoverCharacteristics(nil, for: service)
             } else {
@@ -199,11 +214,11 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
         }
         
         // Check if our service was NOT found
-        if !services.contains(where: { $0.uuid == serviceUUID }) {
+        if !foundConfigService {
             statusMessage = "⚠️ Device is in KEYBOARD mode. Hold RESET button 5 seconds to enter CONFIG mode."
-            print("❌ Config service NOT found! Device might be in KEYBOARD mode.")
-            print("   Expected service UUID: \(serviceUUID)")
-            print("   💡 Hold the RESET button for 5 seconds to enter CONFIG mode")
+            print("❌ Config service NOT found!")
+            print("   Expected: \(serviceUUID.uuidString)")
+            print("   💡 Device must be in CONFIG MODE to configure")
         }
     }
 

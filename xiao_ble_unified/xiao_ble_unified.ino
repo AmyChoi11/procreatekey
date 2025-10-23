@@ -574,10 +574,12 @@ void loop() {
   }
   
   // Reset button - hold for 5 seconds to restart in config mode
-  if (digitalRead(RESET_BTN) == LOW) {
+  // ONLY active in KEYBOARD MODE (no need to reset when already in CONFIG MODE)
+  if (currentMode == MODE_KEYBOARD && digitalRead(RESET_BTN) == LOW) {
     if (!resetPressed) {
       resetPressed = true;
       resetPressTime = millis();
+      Serial.println("🔘 RESET button pressed...");
     } else if (millis() - resetPressTime > 5000) {
       Serial.println("🔄 RESET BUTTON HELD - RESTARTING IN CONFIG MODE");
       
