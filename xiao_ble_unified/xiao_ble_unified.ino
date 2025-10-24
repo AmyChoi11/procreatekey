@@ -363,34 +363,43 @@ void switchToKeyboardMode() {
   Serial.println("⚙️  SWITCHING TO KEYBOARD MODE");
   Serial.println("========================================");
   
+  Serial.println("Step 1: Stopping advertising...");
   // Stop config mode advertising
   if (pServer) {
     BLEDevice::getAdvertising()->stop();
     delay(100);
   }
   
+  Serial.println("Step 2: Deinitializing BLE...");
   // Deinitialize BLE completely
   BLEDevice::deinit(true);
   delay(500);
   
+  Serial.println("Step 3: Reinitializing as keyboard...");
   // Reinitialize in keyboard mode
   BLEDevice::init("XIAO Keyboard");
+  Serial.println("Step 4: Device initialized");
   
+  Serial.println("Step 5: Creating server...");
   pServer = BLEDevice::createServer();
   pServer->setCallbacks(new ServerCallbacks());
   
+  Serial.println("Step 6: Creating HID device...");
   hid = new BLEHIDDevice(pServer);
   input = hid->inputReport(1);
   
+  Serial.println("Step 7: Setting device info...");
   // Set HID device info - CRITICAL for iOS to accept it
   hid->manufacturer()->setValue("XIAO");
   hid->pnp(0x02, 0x1234, 0x5678, 0x0110);  // BT SIG, vendor ID, product ID, version
   hid->hidInfo(0x00, 0x01);  // No remote wake, normally connectable
   
+  Serial.println("Step 8: Setting up security...");
   // CRITICAL: Security settings - iOS requires this to accept keyboard input!
   BLESecurity* security = new BLESecurity();
   security->setAuthenticationMode(ESP_LE_AUTH_BOND);
   
+  Serial.println("Step 9: Setting report map...");
   const uint8_t reportMap[] = {
     0x05, 0x01,        // Usage Page (Generic Desktop)
     0x09, 0x06,        // Usage (Keyboard)
@@ -418,12 +427,15 @@ void switchToKeyboardMode() {
     0xC0               // End Collection
   };
   
+  Serial.println("Step 10: Starting HID services...");
   hid->reportMap((uint8_t*)reportMap, sizeof(reportMap));
   hid->startServices();
   
+  Serial.println("Step 11: Waiting for services to initialize...");
   // Important: Give HID services time to fully initialize
   delay(1000);
   
+  Serial.println("Step 12: Setting up advertising...");
   BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
   pAdvertising->setAppearance(0x03C1);  // Keyboard appearance
   pAdvertising->addServiceUUID(hid->hidService()->getUUID());
@@ -434,11 +446,15 @@ void switchToKeyboardMode() {
   pAdvertising->setMinPreferred(0x06);  
   pAdvertising->setMaxPreferred(0x0C);
   
+  Serial.println("Step 13: Starting advertising...");
   pAdvertising->start();  // Use pAdvertising->start() like combined.ino
   
+  Serial.println("Step 14: Setting battery level...");
   hid->setBatteryLevel(100);
   
+  Serial.println("Step 15: SETTING MODE TO KEYBOARD...");
   currentMode = MODE_KEYBOARD;
+  Serial.println("Step 16: Mode changed successfully!");
   
   Serial.println("✓ BLE HID Keyboard started");
   Serial.println("→ Go to iPad Settings → Bluetooth");
