@@ -557,8 +557,19 @@ static bool button3Pressed = false;
 static bool resetPressed = false;
 static unsigned long resetPressTime = 0;
 static long lastEncoderPos = 0;
+static unsigned long lastButtonCheck = 0;
 
 void loop() {
+  // Debug: Check reset button state every 2 seconds
+  if (millis() - lastButtonCheck > 2000) {
+    int resetState = digitalRead(RESET_BTN);
+    Serial.printf("[DEBUG] RESET_BTN (GPIO%d) state: %s, Mode: %s\n", 
+                  RESET_BTN, 
+                  resetState == LOW ? "PRESSED" : "RELEASED",
+                  currentMode == MODE_CONFIG ? "CONFIG" : "KEYBOARD");
+    lastButtonCheck = millis();
+  }
+  
   // Check for config mode timeout (only if in config mode and not yet configured)
   if (currentMode == MODE_CONFIG && !deviceConnected && isFirstBoot) {
     if (millis() - configModeStartTime > CONFIG_MODE_TIMEOUT) {
@@ -573,21 +584,29 @@ void loop() {
     }
   }
   
-  // Reset button - hold for 5 seconds to restart in config mode
-  // ONLY active in KEYBOARD MODE (no need to reset when already in CONFIG MODE)
-  if (currentMode == MODE_KEYBOARD && digitalRead(RESET_BTN) == LOW) {
+  // Reset button - hold for 5 seconds
+  // In KEYBOARD MODE: Switch to CONFIG MODE
+  // In CONFIG MODE: Switch to KEYBOARD MODE (force exit config)
+  if (digitalRead(RESET_BTN) == LOW) {
     if (!resetPressed) {
       resetPressed = true;
       resetPressTime = millis();
       Serial.println("🔘 RESET button pressed...");
     } else if (millis() - resetPressTime > 5000) {
-      Serial.println("🔄 RESET BUTTON HELD - RESTARTING IN CONFIG MODE");
       
-      // Clear the configured flag so it starts in config mode
-      prefs.begin("config", false);
-      prefs.putBool("configured", false);
-      prefs.end();
+      if (currentMode == MODE_KEYBOARD) {
+        // From KEYBOARD → CONFIG
+        Serial.println("🔄 RESET BUTTON HELD - RESTARTING IN CONFIG MODE");
+        prefs.begin("config", false);
+        prefs.putBool("configured", false);
+        prefs.end();
+      } else {
+        // From CONFIG → KEYBOARD
+        Serial.println("🔄 RESET BUTTON HELD - SWITCHING TO KEYBOARD MODE");
+        // Don't clear configured flag, just switch mode
+      }
       
+      // Visual feedback
       for(int i=0; i<10; i++) {
         digitalWrite(LED_PIN, HIGH);
         delay(50);
