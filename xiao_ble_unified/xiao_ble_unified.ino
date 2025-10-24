@@ -573,12 +573,22 @@ void loop() {
       if (currentMode == MODE_KEYBOARD) {
         // From KEYBOARD → CONFIG
         Serial.println("🔄 RESET BUTTON HELD - RESTARTING IN CONFIG MODE");
+        
+        // FIRST: Clear BLE security/bonding data (before clearing config flag)
+        Serial.println("→ Clearing BLE bonding data...");
+        Preferences ble_prefs;
+        ble_prefs.begin("blesec", false);  // BLE security namespace
+        ble_prefs.clear();  // Clear all bonding data
+        ble_prefs.end();
+        Serial.println("→ BLE bonds cleared");
+        
         Serial.println("→ Clearing 'configured' flag...");
         prefs.begin("config", false);
         prefs.putBool("configured", false);
         bool saved = prefs.getBool("configured", true);  // Read back to verify
         prefs.end();
         Serial.printf("→ Verified: configured = %s\n", saved ? "true (ERROR!)" : "false (OK)");
+        Serial.println("→ On iPad: Go to Bluetooth Settings → Forget 'XIAO Keyboard'");
       } else {
         // From CONFIG → KEYBOARD
         Serial.println("🔄 RESET BUTTON HELD - SWITCHING TO KEYBOARD MODE");

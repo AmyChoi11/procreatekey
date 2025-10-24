@@ -282,6 +282,10 @@ struct DeviceSelectionSheet: View {
                             Text("2️⃣ After configuration: Hold RESET button for 5 seconds").font(.caption)
                             Text("3️⃣ LED will flash rapidly 10 times").font(.caption)
                             Text("4️⃣ Device shows as 'XIAO_Config'").font(.caption)
+                            Text("").font(.caption)
+                            Text("⚠️ If device was paired to iPad:").font(.subheadline).bold().foregroundColor(.red)
+                            Text("Go to Settings → Bluetooth → Forget 'XIAO Keyboard'").font(.caption).foregroundColor(.red)
+                            Text("Then hold RESET button again").font(.caption).foregroundColor(.red)
                         }
                         .padding()
                         .background(Color.orange.opacity(0.1))
