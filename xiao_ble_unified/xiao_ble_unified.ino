@@ -7,11 +7,11 @@
  * - Hold RESET 5 seconds: Return to CONFIG MODE
  * 
  * HARDWARE:
- * - Button 1 (Pin 4): Configurable (Undo/Redo/Erase/Brush Size 5%)
- * - Button 2 (Pin 5): Configurable (Undo/Redo/Erase/Brush Size 5%)
+ * - Button 1 (Pin 3): One side to GPIO3, other to GND
+ * - Button 2 (Pin 4): One side to GPIO4, other to GND
  * - Button 1+2: Configurable (Color Palette/Brush Library)
- * - Dial (Pin 7/6): Configurable (Brush Size 5%/Brush Size 10%)
- * - Reset Button (Pin 16): Hold 5 sec to reconfigure
+ * - Dial (Pin 5/6): Encoder A to GPIO5, Encoder B to GPIO6
+ * - Reset Button (Pin 1): One side to GPIO1, other to 3V3 (NOT 5V!)
  * 
  * FUNCTION CODES:
  * 3 = Undo (Cmd+Z)
@@ -38,7 +38,7 @@
 #define BUTTON2_PIN 4
 #define ENCODER_A   5
 #define ENCODER_B   6
-#define RESET_BTN   16  // Changed from GPIO15 (boot pin) to GPIO16
+#define RESET_BTN   1  // Changed from GPIO15 (boot pin) to GPIO16
 #define LED_PIN     2
 
 // ============= Key Codes =============
@@ -483,7 +483,7 @@ void setup() {
   pinMode(BUTTON2_PIN, INPUT_PULLUP);
   pinMode(ENCODER_A, INPUT_PULLUP);
   pinMode(ENCODER_B, INPUT_PULLUP);
-  pinMode(RESET_BTN, INPUT_PULLUP);
+  pinMode(RESET_BTN, INPUT_PULLDOWN);  // PULLDOWN because button connects to VCC (3.3V)
   pinMode(LED_PIN, OUTPUT);
   
   attachInterrupt(digitalPinToInterrupt(ENCODER_A), handleEncoder, CHANGE);
@@ -541,7 +541,7 @@ void loop() {
     int resetState = digitalRead(RESET_BTN);
     Serial.printf("[DEBUG] RESET_BTN (GPIO%d) state: %s, Mode: %s\n", 
                   RESET_BTN, 
-                  resetState == LOW ? "PRESSED" : "RELEASED",
+                  resetState == HIGH ? "PRESSED" : "RELEASED",  // HIGH when pressed (connected to VCC)
                   currentMode == MODE_CONFIG ? "CONFIG" : "KEYBOARD");
     lastButtonCheck = millis();
   }
@@ -563,7 +563,7 @@ void loop() {
   // Reset button - hold for 5 seconds
   // In KEYBOARD MODE: Switch to CONFIG MODE
   // In CONFIG MODE: Switch to KEYBOARD MODE (force exit config)
-  if (digitalRead(RESET_BTN) == LOW) {
+  if (digitalRead(RESET_BTN) == HIGH) {  // HIGH when pressed (button connected to VCC)
     if (!resetPressed) {
       resetPressed = true;
       resetPressTime = millis();
