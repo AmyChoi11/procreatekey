@@ -57,7 +57,6 @@ DeviceMode currentMode = MODE_CONFIG;
 unsigned long configModeStartTime = 0;
 const unsigned long CONFIG_MODE_TIMEOUT = 30000; // 30 seconds
 bool isFirstBoot = true;  // Check if this is first boot or has been configured
-bool isSwitchingMode = false;  // Flag to prevent loop execution during mode switch
 
 // ============= Encoder Settings =============
 volatile long encoderPos = 0;
@@ -364,122 +363,71 @@ void IRAM_ATTR handleEncoder() {
 }
 
 // ============= Mode Switching =============
-void switchToKeyboardMode() {
-  isSwitchingMode = true;  // Prevent loop execution during switch
+void initKeyboardMode() {
+  // This function is called from setup() when device is configured
+  Serial.println("\n⌨️  INITIALIZING KEYBOARD MODE");
   
-  Serial.println("\n========================================");
-  Serial.println("⚙️  SWITCHING TO KEYBOARD MODE");
-  Serial.println("========================================");
-  
-  Serial.println("Step 1: Stopping advertising...");
-  // Stop config mode advertising
-  if (pServer) {
-    BLEDevice::getAdvertising()->stop();
-    delay(100);
-  }
-  
-  Serial.println("Step 2: Deinitializing BLE...");
-  // Deinitialize BLE completely
-  BLEDevice::deinit(true);
-  Serial.println("Step 2a: Waiting for BLE cleanup...");
-  delay(1000);  // Increased delay for BLE cleanup
-  
-  Serial.println("Step 3: Reinitializing as keyboard...");
-  // Reinitialize in keyboard mode
   BLEDevice::init("XIAO Keyboard");
-  Serial.println("Step 4: Device initialized");
-  delay(200);  // Give init time to complete
   
-  Serial.println("Step 5: Creating server...");
   pServer = BLEDevice::createServer();
   pServer->setCallbacks(new ServerCallbacks());
   
-  Serial.println("Step 6: Creating HID device...");
   hid = new BLEHIDDevice(pServer);
   input = hid->inputReport(1);
   
-  Serial.println("Step 7: Setting device info...");
   // Set HID device info - CRITICAL for iOS to accept it
   hid->manufacturer()->setValue("XIAO");
-  hid->pnp(0x02, 0x1234, 0x5678, 0x0110);  // BT SIG, vendor ID, product ID, version
-  hid->hidInfo(0x00, 0x01);  // No remote wake, normally connectable
+  hid->pnp(0x02, 0x1234, 0x5678, 0x0110);
+  hid->hidInfo(0x00, 0x01);
   
-  Serial.println("Step 8: Setting up security...");
-  // CRITICAL: Security settings - iOS requires this to accept keyboard input!
+  // CRITICAL: Security settings - iOS requires this!
   BLESecurity* security = new BLESecurity();
   security->setAuthenticationMode(ESP_LE_AUTH_BOND);
   
-  Serial.println("Step 9: Setting report map...");
   const uint8_t reportMap[] = {
-    0x05, 0x01,        // Usage Page (Generic Desktop)
-    0x09, 0x06,        // Usage (Keyboard)
-    0xA1, 0x01,        // Collection (Application)
-    0x85, 0x01,        //   Report ID (1)
-    0x05, 0x07,        //   Usage Page (Key Codes)
-    0x19, 0xE0,        //   Usage Minimum (224)
-    0x29, 0xE7,        //   Usage Maximum (231)
-    0x15, 0x00,        //   Logical Minimum (0)
-    0x25, 0x01,        //   Logical Maximum (1)
-    0x75, 0x01,        //   Report Size (1)
-    0x95, 0x08,        //   Report Count (8)
-    0x81, 0x02,        //   Input (Data, Variable, Absolute)
-    0x95, 0x01,        //   Report Count (1)
-    0x75, 0x08,        //   Report Size (8)
-    0x81, 0x01,        //   Input (Constant)
-    0x95, 0x06,        //   Report Count (6)
-    0x75, 0x08,        //   Report Size (8)
-    0x15, 0x00,        //   Logical Minimum (0)
-    0x25, 0x65,        //   Logical Maximum (101)
-    0x05, 0x07,        //   Usage Page (Key Codes)
-    0x19, 0x00,        //   Usage Minimum (0)
-    0x29, 0x65,        //   Usage Maximum (101)
-    0x81, 0x00,        //   Input (Data, Array)
-    0xC0               // End Collection
+    0x05, 0x01, 0x09, 0x06, 0xA1, 0x01, 0x85, 0x01, 0x05, 0x07,
+    0x19, 0xE0, 0x29, 0xE7, 0x15, 0x00, 0x25, 0x01, 0x75, 0x01,
+    0x95, 0x08, 0x81, 0x02, 0x95, 0x01, 0x75, 0x08, 0x81, 0x01,
+    0x95, 0x06, 0x75, 0x08, 0x15, 0x00, 0x25, 0x65, 0x05, 0x07,
+    0x19, 0x00, 0x29, 0x65, 0x81, 0x00, 0xC0
   };
   
-  Serial.println("Step 10: Starting HID services...");
   hid->reportMap((uint8_t*)reportMap, sizeof(reportMap));
   hid->startServices();
   
-  Serial.println("Step 11: Waiting for services to initialize...");
-  // Important: Give HID services time to fully initialize
-  delay(1000);
-  
-  Serial.println("Step 12: Setting up advertising...");
   BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
-  pAdvertising->setAppearance(0x03C1);  // Keyboard appearance
+  pAdvertising->setAppearance(0x03C1);
   pAdvertising->addServiceUUID(hid->hidService()->getUUID());
   pAdvertising->setScanResponse(true);
-  
-  // Set connection interval preferences for iOS (in units of 1.25ms)
-  // Min: 7.5ms (6 * 1.25ms), Max: 15ms (12 * 1.25ms)
-  pAdvertising->setMinPreferred(0x06);  
+  pAdvertising->setMinPreferred(0x06);
   pAdvertising->setMaxPreferred(0x0C);
+  pAdvertising->start();
   
-  Serial.println("Step 13: Starting advertising...");
-  pAdvertising->start();  // Use pAdvertising->start() like combined.ino
-  
-  Serial.println("Step 14: Setting battery level...");
   hid->setBatteryLevel(100);
   
-  Serial.println("Step 15: SETTING MODE TO KEYBOARD...");
   currentMode = MODE_KEYBOARD;
-  Serial.println("Step 16: Mode changed successfully!");
   
-  Serial.println("✓ BLE HID Keyboard started");
-  Serial.println("→ Go to iPad Settings → Bluetooth");
-  Serial.println("→ Tap 'XIAO Keyboard' to pair");
-  Serial.println("========================================\n");
+  Serial.println("✅ KEYBOARD MODE ACTIVE");
+  Serial.println("→ Device name: XIAO Keyboard");
+  Serial.println("→ Go to iPad Settings → Bluetooth to pair\n");
+}
+
+void switchToKeyboardMode() {
+  Serial.println("\n========================================");
+  Serial.println("⚙️  SWITCHING TO KEYBOARD MODE");
+  Serial.println("========================================");
+  Serial.println("💡 Using ESP32 restart for clean mode change...");
   
-  // Flash LED rapidly to indicate mode change
-  for(int i=0; i<10; i++) {
-    digitalWrite(LED_PIN, HIGH);
-    delay(50);
-    digitalWrite(LED_PIN, LOW);
-    delay(50);
-  }
+  // Mark as configured so next boot goes to keyboard mode
+  prefs.begin("config", false);
+  prefs.putBool("configured", true);
+  prefs.end();
   
-  isSwitchingMode = false;  // Re-enable loop execution
+  Serial.println("🔄 RESTARTING IN 1 SECOND...\n");
+  Serial.flush();
+  delay(1000);
+  
+  ESP.restart();
 }
 
 void startConfigMode() {
@@ -560,7 +508,7 @@ void setup() {
   // If already configured, skip config mode and go straight to keyboard mode
   if (!isFirstBoot) {
     Serial.println("✓ Device already configured - starting in KEYBOARD MODE");
-    switchToKeyboardMode();
+    initKeyboardMode();  // Initialize keyboard mode directly (no restart needed)
   } else {
     Serial.println("⚠ First boot - starting in CONFIG MODE");
     // Start in config mode
@@ -588,12 +536,6 @@ static long lastEncoderPos = 0;
 static unsigned long lastButtonCheck = 0;
 
 void loop() {
-  // Don't execute loop during mode switching
-  if (isSwitchingMode) {
-    delay(100);
-    return;
-  }
-  
   // Debug: Check reset button state every 2 seconds
   if (millis() - lastButtonCheck > 2000) {
     int resetState = digitalRead(RESET_BTN);
