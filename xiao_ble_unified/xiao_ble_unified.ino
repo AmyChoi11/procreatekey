@@ -57,6 +57,7 @@ DeviceMode currentMode = MODE_CONFIG;
 unsigned long configModeStartTime = 0;
 const unsigned long CONFIG_MODE_TIMEOUT = 30000; // 30 seconds
 bool isFirstBoot = true;  // Check if this is first boot or has been configured
+bool isSwitchingMode = false;  // Flag to prevent loop execution during mode switch
 
 // ============= Encoder Settings =============
 volatile long encoderPos = 0;
@@ -364,6 +365,8 @@ void IRAM_ATTR handleEncoder() {
 
 // ============= Mode Switching =============
 void switchToKeyboardMode() {
+  isSwitchingMode = true;  // Prevent loop execution during switch
+  
   Serial.println("\n========================================");
   Serial.println("⚙️  SWITCHING TO KEYBOARD MODE");
   Serial.println("========================================");
@@ -378,12 +381,14 @@ void switchToKeyboardMode() {
   Serial.println("Step 2: Deinitializing BLE...");
   // Deinitialize BLE completely
   BLEDevice::deinit(true);
-  delay(500);
+  Serial.println("Step 2a: Waiting for BLE cleanup...");
+  delay(1000);  // Increased delay for BLE cleanup
   
   Serial.println("Step 3: Reinitializing as keyboard...");
   // Reinitialize in keyboard mode
   BLEDevice::init("XIAO Keyboard");
   Serial.println("Step 4: Device initialized");
+  delay(200);  // Give init time to complete
   
   Serial.println("Step 5: Creating server...");
   pServer = BLEDevice::createServer();
@@ -473,6 +478,8 @@ void switchToKeyboardMode() {
     digitalWrite(LED_PIN, LOW);
     delay(50);
   }
+  
+  isSwitchingMode = false;  // Re-enable loop execution
 }
 
 void startConfigMode() {
@@ -581,6 +588,12 @@ static long lastEncoderPos = 0;
 static unsigned long lastButtonCheck = 0;
 
 void loop() {
+  // Don't execute loop during mode switching
+  if (isSwitchingMode) {
+    delay(100);
+    return;
+  }
+  
   // Debug: Check reset button state every 2 seconds
   if (millis() - lastButtonCheck > 2000) {
     int resetState = digitalRead(RESET_BTN);
