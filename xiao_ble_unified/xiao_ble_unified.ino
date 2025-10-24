@@ -125,13 +125,13 @@ class SecurityCallbacks : public BLESecurityCallbacks {
 class ServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) {
     deviceConnected = true;
-    Serial.println("✓ Client connected");
+    Serial.printf("✓ Client connected (Mode: %s)\n", currentMode == MODE_CONFIG ? "CONFIG" : "KEYBOARD");
     digitalWrite(LED_PIN, HIGH);
   }
   
   void onDisconnect(BLEServer* pServer) {
     deviceConnected = false;
-    Serial.println("✗ Client disconnected");
+    Serial.printf("✗ Client disconnected (Mode: %s)\n", currentMode == MODE_CONFIG ? "CONFIG" : "KEYBOARD");
     digitalWrite(LED_PIN, LOW);
     
     // In keyboard mode, restart advertising
@@ -139,6 +139,8 @@ class ServerCallbacks : public BLEServerCallbacks {
       delay(500);
       BLEDevice::startAdvertising();
       Serial.println("→ Restarted advertising");
+    } else if (currentMode == MODE_CONFIG) {
+      Serial.println("→ Staying in CONFIG mode, ready for reconnection");
     }
   }
 };
@@ -146,7 +148,10 @@ class ServerCallbacks : public BLEServerCallbacks {
 // ============= Config Callbacks =============
 class ConfigCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic* pChar) {
+    Serial.println("\n🔔 onWrite() callback triggered!");
     std::string value = pChar->getValue();
+    Serial.printf("→ Received %d bytes\n", value.length());
+    
     if (value.length() > 0) {
       Serial.println("\n========================================");
       Serial.println("📥 RECEIVED CONFIG FROM iOS APP");
@@ -613,9 +618,12 @@ void loop() {
       if (currentMode == MODE_KEYBOARD) {
         // From KEYBOARD → CONFIG
         Serial.println("🔄 RESET BUTTON HELD - RESTARTING IN CONFIG MODE");
+        Serial.println("→ Clearing 'configured' flag...");
         prefs.begin("config", false);
         prefs.putBool("configured", false);
+        bool saved = prefs.getBool("configured", true);  // Read back to verify
         prefs.end();
+        Serial.printf("→ Verified: configured = %s\n", saved ? "true (ERROR!)" : "false (OK)");
       } else {
         // From CONFIG → KEYBOARD
         Serial.println("🔄 RESET BUTTON HELD - SWITCHING TO KEYBOARD MODE");
