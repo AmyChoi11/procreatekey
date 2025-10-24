@@ -19,7 +19,7 @@
  * 5 = Erase (E key)
  * 6 = Brush Size 5% ([ / ] keys)
  * 7 = Color Palette (Cmd+C)
- * 8 = Brush Library (Cmd+B)
+ * 8 = Brush Library (B key)
  * 9 = Brush Size 10% (Up+] / Down+[)
  */
 
@@ -276,9 +276,9 @@ void sendFunctionKey(int functionCode) {
       modifier = 0x08;  // Left GUI (Command)
       key = 0x06;       // C key
       break;
-    case 8:  // Brush Library (Cmd+B)
-      Serial.println("   → Brush Library (Cmd+B)");
-      modifier = 0x08;  // Left GUI (Command)
+    case 8:  // Brush Library (B)
+      Serial.println("   → Brush Library (B)");
+      modifier = 0;     // No modifier
       key = 0x05;       // B key
       break;
     case 9:  // Brush Size 10% control
