@@ -134,10 +134,19 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
         // Filter out devices with very weak signal
         guard RSSI.intValue > -90 else { return }
         
-        // Only show XIAO_Config devices (in config mode)
+        // Check if device name starts with "XIAO"
         let deviceName = peripheral.name ?? "Unknown"
-        guard deviceName == "XIAO_Config" else {
-            // Silently ignore other devices including "XIAO Keyboard"
+        guard deviceName.hasPrefix("XIAO") else {
+            return
+        }
+        
+        // CRITICAL: Only show devices advertising the config service UUID
+        // This prevents connecting to keyboard mode devices
+        let advertisedServices = advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID] ?? []
+        let configServiceUUID = CBUUID(string: "12345678-1234-5678-1234-56789abcdef0")
+        
+        guard advertisedServices.contains(where: { $0.uuidString.uppercased() == configServiceUUID.uuidString.uppercased() }) else {
+            // Device doesn't advertise config service - it's in keyboard mode, ignore it
             return
         }
         

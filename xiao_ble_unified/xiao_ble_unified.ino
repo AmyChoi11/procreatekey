@@ -34,9 +34,9 @@
 #include <HIDTypes.h>
 
 // ============= Pin Definitions =============
-#define BUTTON1_PIN 4
-#define BUTTON2_PIN 5
-#define ENCODER_A   7
+#define BUTTON1_PIN 3
+#define BUTTON2_PIN 4
+#define ENCODER_A   5
 #define ENCODER_B   6
 #define RESET_BTN   16  // Changed from GPIO15 (boot pin) to GPIO16
 #define LED_PIN     2
@@ -367,7 +367,7 @@ void initKeyboardMode() {
   // This function is called from setup() when device is configured
   Serial.println("\n⌨️  INITIALIZING KEYBOARD MODE");
   
-  BLEDevice::init("XIAO Keyboard");
+  BLEDevice::init("XIAO Keyboard");  // Different name for keyboard mode
   
   pServer = BLEDevice::createServer();
   pServer->setCallbacks(new ServerCallbacks());
