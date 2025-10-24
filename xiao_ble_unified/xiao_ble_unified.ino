@@ -7,11 +7,11 @@
  * - Hold RESET 5 seconds: Return to CONFIG MODE
  * 
  * HARDWARE:
- * - Button 1 (Pin 1): Configurable (Undo/Redo/Erase/Brush Size 5%)
- * - Button 2 (Pin 3): Configurable (Undo/Redo/Erase/Brush Size 5%)
+ * - Button 1 (Pin 4): Configurable (Undo/Redo/Erase/Brush Size 5%)
+ * - Button 2 (Pin 5): Configurable (Undo/Redo/Erase/Brush Size 5%)
  * - Button 1+2: Configurable (Color Palette/Brush Library)
  * - Dial (Pin 7/6): Configurable (Brush Size 5%/Brush Size 10%)
- * - Reset Button (Pin 15): Hold 5 sec to reconfigure
+ * - Reset Button (Pin 16): Hold 5 sec to reconfigure
  * 
  * FUNCTION CODES:
  * 3 = Undo (Cmd+Z)
@@ -38,7 +38,7 @@
 #define BUTTON2_PIN 5
 #define ENCODER_A   7
 #define ENCODER_B   6
-#define RESET_BTN   15
+#define RESET_BTN   16  // Changed from GPIO15 (boot pin) to GPIO16
 #define LED_PIN     2
 
 // ============= Key Codes =============
