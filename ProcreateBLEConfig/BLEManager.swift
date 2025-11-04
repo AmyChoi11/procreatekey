@@ -60,7 +60,7 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
         isScanning = false
         scanTimer?.invalidate()
         if devices.isEmpty {
-            statusMessage = "No 'XIAO_Config' found.\n\n💡 Make sure device is in CONFIG MODE:\n- First boot: automatic\n- Otherwise: Hold RESET button 5 seconds"
+            statusMessage = "No XIAO devices found.\n\n💡 Make sure:\n- Device is powered on\n- Bluetooth is enabled\n- Device is nearby"
         } else {
             statusMessage = "Found \(devices.count) device(s). Tap to connect."
         }
@@ -140,19 +140,13 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
             return
         }
         
-        // CRITICAL: Only show devices advertising the config service UUID
-        // This prevents connecting to keyboard mode devices
-        let advertisedServices = advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID] ?? []
-        let configServiceUUID = CBUUID(string: "12345678-1234-5678-1234-56789abcdef0")
-        
-        guard advertisedServices.contains(where: { $0.uuidString.uppercased() == configServiceUUID.uuidString.uppercased() }) else {
-            // Device doesn't advertise config service - it's in keyboard mode, ignore it
-            return
-        }
+        // MODELESS DESIGN: Config service is always available
+        // No need to filter by advertised services anymore
+        // Just show all XIAO devices - they all have config service!
         
         // Only add if not already in list
         if !devices.contains(where: { $0.identifier == peripheral.identifier }) {
-            print("📱 Found config device: \(deviceName) - RSSI: \(RSSI)")
+            print("📱 Found device: \(deviceName) - RSSI: \(RSSI)")
             devices.append(peripheral)
             statusMessage = "Found \(devices.count) device(s)..."
         }
