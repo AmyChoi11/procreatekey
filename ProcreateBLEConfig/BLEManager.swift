@@ -8,12 +8,16 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
     @Published var isScanning: Bool = false
     @Published var bluetoothState: CBManagerState = .unknown
     @Published var currentConfig: [String: Int] = ["button1": 3, "button2": 3, "combo": 7, "dial": 9]
+    @Published var detectedProblem: DetectedProblem?
+    
     private var central: CBCentralManager!
     private var targetPeripheral: CBPeripheral?
     private let serviceUUID = CBUUID(string: "12345678-1234-5678-1234-56789abcdef0")
     private let configCharUUID = CBUUID(string: "12345678-1234-5678-1234-56789abcdef1")
     private var configChar: CBCharacteristic?
     private var scanTimer: Timer?
+    private var noDevicesTimer: Timer?
+    private var connectionTimeout: Timer?
 
     override init() {
         super.init()
@@ -21,37 +25,48 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
     }
 
     func startScan() {
-        // Check if running in simulator
         #if targetEnvironment(simulator)
-        statusMessage = "⚠️ Bluetooth is not available in iOS Simulator. Please test on a real device."
+        statusMessage = "Bluetooth not available in Simulator"
         return
         #endif
         
         guard central.state == .poweredOn else {
             switch central.state {
             case .poweredOff:
-                statusMessage = "⚠️ Bluetooth is turned off. Please enable Bluetooth in Settings."
+                statusMessage = "Bluetooth is off"
+                detectedProblem = .bluetoothOff
             case .unauthorized:
-                statusMessage = "⚠️ Bluetooth permission denied. Please enable in Settings."
+                statusMessage = "No Bluetooth permission"
+                detectedProblem = .noPermission
             case .unsupported:
-                statusMessage = "⚠️ Bluetooth is not supported on this device."
+                statusMessage = "Bluetooth not supported"
             default:
-                statusMessage = "⚠️ Bluetooth not ready. Please wait or check Settings."
+                statusMessage = "Bluetooth not ready"
             }
             return
         }
         
         devices.removeAll()
         isScanning = true
-        statusMessage = "Scanning for devices..."
+        statusMessage = "Scanning..."
+        detectedProblem = nil
         
-        // Scan without service filter for better compatibility
+        print("🔍 Starting BLE scan")
+        
         central.scanForPeripherals(withServices: nil, options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
         
-        // Stop scan after 10 seconds
         scanTimer?.invalidate()
         scanTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: false) { [weak self] _ in
             self?.stopScan()
+        }
+        
+        // Detect if no devices found after 8 seconds
+        noDevicesTimer?.invalidate()
+        noDevicesTimer = Timer.scheduledTimer(withTimeInterval: 8.0, repeats: false) { [weak self] _ in
+            guard let self = self else { return }
+            if self.devices.isEmpty && self.isScanning {
+                self.detectedProblem = .noDevicesFound
+            }
         }
     }
     
@@ -59,10 +74,14 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
         central.stopScan()
         isScanning = false
         scanTimer?.invalidate()
+        noDevicesTimer?.invalidate()
+        
+        print("⏹️ Scan stopped. Found \(devices.count) device(s)")
+        
         if devices.isEmpty {
-            statusMessage = "No XIAO devices found.\n\n💡 Make sure:\n- Device is powered on\n- Bluetooth is enabled\n- Device is nearby"
+            statusMessage = "No devices found"
         } else {
-            statusMessage = "Found \(devices.count) device(s). Tap to connect."
+            statusMessage = "Found \(devices.count) device(s)"
         }
     }
 
@@ -71,7 +90,16 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
         targetPeripheral = peripheral
         peripheral.delegate = self
         central.connect(peripheral, options: nil)
-        statusMessage = "Connecting to \(peripheral.name ?? "device")..."
+        statusMessage = "Connecting..."
+        
+        connectionTimeout?.invalidate()
+        connectionTimeout = Timer.scheduledTimer(withTimeInterval: 15.0, repeats: false) { [weak self] _ in
+            guard let self = self else { return }
+            if !self.isConnected {
+                self.detectedProblem = .connectionFailed
+                self.central.cancelPeripheralConnection(peripheral)
+            }
+        }
     }
     
     func disconnect() {
@@ -131,12 +159,26 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
     }
 
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi RSSI: NSNumber) {
+        let deviceName = peripheral.name ?? "Unknown"
+        
+        // Debug: Log ALL discovered devices
+        print("🔍 Discovered: \(deviceName) - RSSI: \(RSSI.intValue)")
+        if let localName = advertisementData[CBAdvertisementDataLocalNameKey] as? String {
+            print("   Local Name: \(localName)")
+        }
+        if let serviceUUIDs = advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID] {
+            print("   Services: \(serviceUUIDs.map { $0.uuidString })")
+        }
+        
         // Filter out devices with very weak signal
-        guard RSSI.intValue > -90 else { return }
+        guard RSSI.intValue > -90 else { 
+            print("   ❌ Rejected: Signal too weak")
+            return 
+        }
         
         // Check if device name starts with "XIAO"
-        let deviceName = peripheral.name ?? "Unknown"
         guard deviceName.hasPrefix("XIAO") else {
+            print("   ❌ Rejected: Name doesn't start with 'XIAO'")
             return
         }
         
@@ -146,9 +188,11 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
         
         // Only add if not already in list
         if !devices.contains(where: { $0.identifier == peripheral.identifier }) {
-            print("📱 Found device: \(deviceName) - RSSI: \(RSSI)")
+            print("   ✅ ACCEPTED: Adding to device list")
             devices.append(peripheral)
             statusMessage = "Found \(devices.count) device(s)..."
+        } else {
+            print("   ℹ️ Already in list")
         }
     }
 

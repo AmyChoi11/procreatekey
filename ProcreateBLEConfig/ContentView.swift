@@ -3,12 +3,16 @@ import CoreBluetooth
 
 struct ContentView: View {
     @StateObject private var bleManager = BLEManager()
+    @Environment(\.scenePhase) private var scenePhase
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     
     // Store configuration as numeric codes
     // Note: "combo" refers to button1+2 pressed together
     @State private var config: [String: Int] = ["button1": 3, "button2": 3, "combo": 7, "dial": 9]
     @State private var showDeviceSheet = false
     @State private var hasShownInitialSheet = false
+    @State private var showOnboarding = false
+    @State private var showHelp = false
     
     let circleButton1Options = ["Undo", "Redo", "Erase"]
     let circleButton2Options = ["Undo", "Redo", "Erase"]
@@ -95,7 +99,10 @@ struct ContentView: View {
                                 Text(bleManager.statusMessage).multilineTextAlignment(.center).padding()
                             }
                             .frame(maxWidth: .infinity)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(bleManager.statusMessage.contains("⚠️") ? Color.orange.opacity(0.1) : Color.green.opacity(0.1)))
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(bleManager.statusMessage.contains("⚠️") ? Color.orange.opacity(0.1) : Color.green.opacity(0.1))
+                            )
                             .padding(.horizontal)
                         }
                     }
@@ -106,18 +113,25 @@ struct ContentView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: { 
-                        if !bleManager.isScanning { 
-                            bleManager.startScan()
-                            showDeviceSheet = true 
-                        } 
-                    }) {
-                        // Use alternative icon for simulator compatibility
-                        Image(systemName: bleManager.isScanning ? "antenna.radiowaves.left.and.right" : "wave.3.right")
-                            .foregroundColor(.white)
-                            .font(.system(size: 18))
+                    HStack(spacing: 16) {
+                        Button(action: { 
+                            if !bleManager.isScanning { 
+                                bleManager.startScan()
+                                showDeviceSheet = true 
+                            } 
+                        }) {
+                            Image(systemName: bleManager.isScanning ? "antenna.radiowaves.left.and.right" : "wave.3.right")
+                                .foregroundColor(.white)
+                                .font(.system(size: 18))
+                        }
+                        .disabled(bleManager.isScanning)
+                        
+                        Button(action: { showHelp = true }) {
+                            Image(systemName: "questionmark.circle")
+                                .foregroundColor(.white)
+                                .font(.system(size: 18))
+                        }
                     }
-                    .disabled(bleManager.isScanning)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: 16) {
@@ -127,11 +141,12 @@ struct ContentView: View {
                                     .foregroundColor(.white)
                             }
                         }
-                        Button(action: { saveConfiguration() }) { 
-                            Image(systemName: "arrow.down.circle")
+                        
+                        Button(action: { showOnboarding = true }) {
+                            Image(systemName: "info.circle")
                                 .foregroundColor(.white)
+                                .font(.system(size: 18))
                         }
-                        .disabled(!bleManager.isConnected)
                     }
                 }
             }
@@ -142,17 +157,29 @@ struct ContentView: View {
         .sheet(isPresented: $showDeviceSheet) { 
             DeviceSelectionSheet(bleManager: bleManager, showDeviceSheet: $showDeviceSheet) 
         }
+        .sheet(isPresented: $showOnboarding) {
+            OnboardingView(showOnboarding: $showOnboarding)
+        }
+        .sheet(isPresented: $showHelp) {
+            HelpView()
+                .environmentObject(bleManager)
+        }
         .onReceive(bleManager.$isConnected) { connected in 
             if connected { 
                 showDeviceSheet = false 
             }
         }
         .onReceive(bleManager.$currentConfig) { newConfig in
-            // Update local config when device config is read - exactly like the working version
             print("📥 Loading configuration from device: \(newConfig)")
             self.config = newConfig
         }
         .onAppear {
+            // Show onboarding only on first launch
+            if !hasCompletedOnboarding {
+                showOnboarding = true
+                hasCompletedOnboarding = true
+            }
+            
             // Automatically show device selection sheet on first launch
             if !hasShownInitialSheet && !bleManager.isConnected {
                 hasShownInitialSheet = true
@@ -160,6 +187,26 @@ struct ContentView: View {
                     bleManager.startScan()
                     showDeviceSheet = true
                 }
+            }
+        }
+        .onChange(of: scenePhase) { newPhase in
+            switch newPhase {
+            case .background:
+                print("📱 App going to background, disconnecting...")
+                if bleManager.isConnected {
+                    bleManager.disconnect()
+                }
+            case .inactive:
+                print("📱 App inactive")
+            case .active:
+                print("📱 App active")
+            @unknown default:
+                break
+            }
+        }
+        .onChange(of: bleManager.detectedProblem) { problem in
+            if problem != nil {
+                showHelp = true
             }
         }
     }
@@ -173,13 +220,21 @@ struct ContentView: View {
             },
             set: { newValue in
                 config[configKey] = optionToCode(newValue)
+                // Automatically save configuration when changed
+                if bleManager.isConnected {
+                    saveConfiguration()
+                }
             }
         )
         
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Image(systemName: icon).foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6)).font(.system(size: 20))
-                Text(title).font(.system(size: 18, weight: .bold)).foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                Image(systemName: icon)
+                    .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                    .font(.system(size: 20))
+                Text(title)
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
             }
             Menu {
                 ForEach(options, id: \.self) { option in
@@ -191,16 +246,31 @@ struct ContentView: View {
                 }
             } label: {
                 HStack {
-                    Text(selection.wrappedValue).foregroundColor(.black).fontWeight(.medium)
+                    Text(selection.wrappedValue)
+                        .foregroundColor(.black)
+                        .fontWeight(.medium)
                     Spacer()
-                    Image(systemName: "chevron.down").foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                    Image(systemName: "chevron.down")
+                        .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
                 }
-                .padding().background(getToolColor(for: selection.wrappedValue)).cornerRadius(8)
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(red: 0.4, green: 0.2, blue: 0.6).opacity(0.3), lineWidth: 1))
+                .padding()
+                .background(getToolColor(for: selection.wrappedValue))
+                .cornerRadius(8)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(red: 0.4, green: 0.2, blue: 0.6).opacity(0.3), lineWidth: 1)
+                )
             }
-            Text("Selected: \(selection.wrappedValue)").font(.system(size: 14)).foregroundColor(.gray)
+            Text("Selected: \(selection.wrappedValue)")
+                .font(.system(size: 14))
+                .foregroundColor(.gray)
         }
-        .padding().background(RoundedRectangle(cornerRadius: 12).fill(Color.white).shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2))
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.white)
+                .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+        )
     }
     
     func getToolColor(for option: String) -> Color {
