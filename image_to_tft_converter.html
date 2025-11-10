@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image to TFT Converter</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            background-color: #fafafa;
+        }
+        .upload-area:hover {
+            border-color: #007bff;
+            background-color: #f0f8ff;
+        }
+        input[type="file"] {
+            margin: 10px 0;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .preview {
+            margin: 20px 0;
+            text-align: center;
+        }
+        .preview img {
+            max-width: 240px;
+            max-height: 135px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .output {
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .download-btn {
+            background-color: #28a745;
+            margin: 5px;
+        }
+        .download-btn:hover {
+            background-color: #218838;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🖼️ Image to TFT Converter</h1>
+        <p>Convert any image to Arduino code for your XIAO ESP32-S3 TFT display!</p>
+        
+        <div class="upload-area">
+            <p>📁 Select an image file</p>
+            <input type="file" id="imageInput" accept="image/*">
+            <br>
+            <button onclick="convertImage()">🔄 Convert to TFT Code</button>
+        </div>
+        
+        <div class="preview" id="preview"></div>
+        
+        <div id="outputSection" style="display: none;">
+            <h3>📋 Generated Arduino Code:</h3>
+            <button class="download-btn" onclick="downloadHeader()">💾 Download Header File (.h)</button>
+            <button class="download-btn" onclick="downloadSketch()">💾 Download Arduino Sketch (.ino)</button>
+            
+            <h4>Header File Content:</h4>
+            <div class="output" id="headerOutput"></div>
+            
+            <h4>Arduino Sketch Content:</h4>
+            <div class="output" id="sketchOutput"></div>
+        </div>
+    </div>
+
+    <script>
+        let imageData = null;
+        let imageName = '';
+
+        function convertImage() {
+            const input = document.getElementById('imageInput');
+            const file = input.files[0];
+            
+            if (!file) {
+                alert('Please select an image file first!');
+                return;
+            }
+            
+            imageName = file.name.split('.')[0].replace(/[^a-zA-Z0-9]/g, '_');
+            
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            
+            img.onload = function() {
+                // Resize to TFT dimensions (240x135)
+                canvas.width = 240;
+                canvas.height = 135;
+                
+                // Draw and resize image
+                ctx.drawImage(img, 0, 0, 240, 135);
+                
+                // Show preview
+                const preview = document.getElementById('preview');
+                preview.innerHTML = `
+                    <h3>📱 Preview (240x135):</h3>
+                    <img src="${canvas.toDataURL()}" alt="Preview">
+                `;
+                
+                // Convert to RGB565 array
+                const imageDataObj = ctx.getImageData(0, 0, 240, 135);
+                const pixels = imageDataObj.data;
+                const rgb565Array = [];
+                
+                for (let i = 0; i < pixels.length; i += 4) {
+                    const r = pixels[i];
+                    const g = pixels[i + 1];
+                    const b = pixels[i + 2];
+                    
+                    // Convert to RGB565
+                    const r5 = (r >> 3) & 0x1F;
+                    const g6 = (g >> 2) & 0x3F;
+                    const b5 = (b >> 3) & 0x1F;
+                    const rgb565 = (r5 << 11) | (g6 << 5) | b5;
+                    
+                    rgb565Array.push(rgb565);
+                }
+                
+                imageData = rgb565Array;
+                generateCode();
+            };
+            
+            img.src = URL.createObjectURL(file);
+        }
+        
+        function generateCode() {
+            const headerCode = generateHeaderCode();
+            const sketchCode = generateSketchCode();
+            
+            document.getElementById('headerOutput').textContent = headerCode;
+            document.getElementById('sketchOutput').textContent = sketchCode;
+            document.getElementById('outputSection').style.display = 'block';
+        }
+        
+        function generateHeaderCode() {
+            let code = `/*
+ * Auto-generated image data for TFT display
+ * Image: ${imageName}
+ * Size: 240x135 pixels
+ * Format: RGB565 (16-bit color)
+ */
+
+#ifndef ${imageName.toUpperCase()}_H
+#define ${imageName.toUpperCase()}_H
+
+#include <stdint.h>
+
+// Image dimensions
+#define IMG_${imageName.toUpperCase()}_WIDTH  240
+#define IMG_${imageName.toUpperCase()}_HEIGHT 135
+
+// Image data (RGB565 format)
+const uint16_t img_${imageName}_data[${imageData.length}] PROGMEM = {
+`;
+            
+            // Add pixel data in rows of 16
+            for (let i = 0; i < imageData.length; i += 16) {
+                const row = imageData.slice(i, i + 16);
+                const hexValues = row.map(pixel => `0x${pixel.toString(16).padStart(4, '0').toUpperCase()}`);
+                code += '  ' + hexValues.join(', ');
+                if (i + 16 < imageData.length) {
+                    code += ',';
+                }
+                code += '\n';
+            }
+            
+            code += `}; 
+
+#endif // ${imageName.toUpperCase()}_H
+`;
+            
+            return code;
+        }
+        
+        function generateSketchCode() {
+            return `/*
+ * TFT Image Display - XIAO ESP32-S3
+ * Displays ${imageName} image FULL SCREEN
+ */
+
+#include <Adafruit_GFX.h>
+#include <Adafruit_ST7789.h>
+#include <SPI.h>
+#include "${imageName}_image.h"
+
+// TFT pins (confirmed working from diagnostic)
+#define TFT_CS   3
+#define TFT_DC   1
+#define TFT_RST  5
+#define TFT_BL   6
+
+// Initialize display
+Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
+
+void setup() {
+  Serial.begin(115200);
+  delay(2000);
+  
+  Serial.println("=== Full Screen TFT Image Display ===");
+  Serial.println("Image: ${imageName}");
+  
+  // Initialize TFT with PERFECT configuration (from diagnostic results)
+  pinMode(TFT_BL, OUTPUT);
+  digitalWrite(TFT_BL, HIGH);
+  
+  tft.init(135, 240);  // Swapped initialization (working config)
+  tft.setRotation(1);  // Rotation 1 = perfect 240x135 full screen
+  tft.fillScreen(ST77XX_BLACK);
+  
+  Serial.println("TFT initialized - Full screen mode");
+  
+  // Show loading message
+  tft.setTextColor(ST77XX_WHITE);
+  tft.setTextSize(2);
+  tft.setCursor(50, 50);
+  tft.println("Loading...");
+  
+  delay(1000);
+  
+  // Display the image FULL SCREEN
+  displayImageFullScreen();
+  
+  Serial.println("Image displayed full screen!");
+}
+
+void loop() {
+  // Static display - image stays on screen
+  delay(1000);
+}
+
+void displayImageFullScreen() {
+  Serial.println("Drawing image to TFT FULL SCREEN...");
+  
+  // Display image data directly to TFT at position (0,0) - FULL SCREEN
+  tft.drawRGBBitmap(0, 0, img_${imageName}_data, 240, 135);
+  
+  // Optional: Add subtle image info overlay in corner
+  showImageInfo();
+}
+
+void showImageInfo() {
+  // Optional: Show image info in corner with semi-transparent background
+  tft.fillRect(0, 0, 80, 25, ST77XX_BLACK);
+  tft.setTextColor(ST77XX_WHITE);
+  tft.setTextSize(1);
+  tft.setCursor(5, 5);
+  tft.print("${imageName}");
+  
+  tft.setCursor(5, 15);
+  tft.print("240x135 FULL");
+}`;
+        }
+        
+        function downloadHeader() {
+            const code = generateHeaderCode();
+            downloadFile(code, `${imageName}_image.h`, 'text/plain');
+        }
+        
+        function downloadSketch() {
+            const code = generateSketchCode();
+            downloadFile(code, `${imageName}_display.ino`, 'text/plain');
+        }
+        
+        function downloadFile(content, filename, contentType) {
+            const blob = new Blob([content], { type: contentType });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
