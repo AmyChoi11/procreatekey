@@ -467,6 +467,22 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showOnboarding) {
             OnboardingView(showOnboarding: $showOnboarding)
+                .interactiveDismissDisabled() // Prevent swipe to dismiss
+                .onDisappear {
+                    // Mark onboarding as completed when dismissed
+                    print("📱 Onboarding dismissed, marking as completed")
+                    hasCompletedOnboarding = true
+                    print("📱 hasCompletedOnboarding is now: \(hasCompletedOnboarding)")
+                    
+                    // Show device sheet after onboarding
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        if !bleManager.isConnected {
+                            print("📱 Showing device sheet after onboarding")
+                            bleManager.startScan()
+                            showDeviceSheet = true
+                        }
+                    }
+                }
         }
         .sheet(isPresented: $showHelp) {
             HelpView()
@@ -497,13 +513,21 @@ struct ContentView: View {
             self.config = newConfig
         }
         .onAppear {
-            // Show onboarding only on first launch
+            print("📱 ContentView appeared.")
+            print("📱 hasCompletedOnboarding (from UserDefaults): \(hasCompletedOnboarding)")
+            print("📱 showOnboarding state: \(showOnboarding)")
+            
+            // IMPORTANT: Force show onboarding on first launch
             if !hasCompletedOnboarding {
+                print("📱 ✅ First launch detected - will show onboarding")
+                // Show immediately without delay
                 showOnboarding = true
-                hasCompletedOnboarding = true
+                return // Don't show device sheet if showing onboarding
+            } else {
+                print("📱 ℹ️ Not first launch - onboarding already completed")
             }
             
-            // Automatically show device selection sheet on first launch
+            // Automatically show device selection sheet on first launch (after onboarding)
             if !hasShownInitialSheet && !bleManager.isConnected {
                 hasShownInitialSheet = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {

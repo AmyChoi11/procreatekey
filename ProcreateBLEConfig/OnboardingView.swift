@@ -86,6 +86,7 @@ struct OnboardingView: View {
                         .cornerRadius(8)
                     } else {
                         Button("Get Started") {
+                            print("📱 Get Started button tapped")
                             showOnboarding = false
                         }
                         .foregroundColor(.white)
@@ -98,6 +99,9 @@ struct OnboardingView: View {
                 .padding(.horizontal, 24)
                 .padding(.bottom, 40)
             }
+        }
+        .onAppear {
+            print("📱 🎉 OnboardingView appeared!")
         }
     }
 }
@@ -129,7 +133,7 @@ struct OnboardingPageView: View {
                         
                         Text(step)
                             .font(.system(size: 16))
-                            .foregroundColor(.primary)
+                            .foregroundColor(.black)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
