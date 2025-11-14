@@ -402,10 +402,11 @@ struct ContentView: View {
                             HStack(spacing: 6) {
                                 Image(systemName: "bluetooth")
                                     .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(bleManager.isConnected ? Color.green : Color(red: 0.4, green: 0.2, blue: 0.6))
                                 Text(bleManager.isConnected ? "Connected" : "Scan")
                                     .font(.system(size: 15, weight: .semibold))
+                                    .foregroundColor(bleManager.isConnected ? Color.green : Color(red: 0.4, green: 0.2, blue: 0.6))
                             }
-                            .foregroundColor(bleManager.isConnected ? Color.green : Color(red: 0.4, green: 0.2, blue: 0.6))
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
                             .background(Color.white.opacity(0.9))
@@ -428,6 +429,13 @@ struct ContentView: View {
                                 .foregroundColor(.white)
                                 .font(.system(size: 18))
                         }
+                        .simultaneousGesture(
+                            LongPressGesture(minimumDuration: 2.0)
+                                .onEnded { _ in
+                                    // Long press to show onboarding again
+                                    showOnboarding = true
+                                }
+                        )
                     }
                 }
                 
@@ -467,22 +475,6 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showOnboarding) {
             OnboardingView(showOnboarding: $showOnboarding)
-                .interactiveDismissDisabled() // Prevent swipe to dismiss
-                .onDisappear {
-                    // Mark onboarding as completed when dismissed
-                    print("📱 Onboarding dismissed, marking as completed")
-                    hasCompletedOnboarding = true
-                    print("📱 hasCompletedOnboarding is now: \(hasCompletedOnboarding)")
-                    
-                    // Show device sheet after onboarding
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        if !bleManager.isConnected {
-                            print("📱 Showing device sheet after onboarding")
-                            bleManager.startScan()
-                            showDeviceSheet = true
-                        }
-                    }
-                }
         }
         .sheet(isPresented: $showHelp) {
             HelpView()
@@ -513,21 +505,13 @@ struct ContentView: View {
             self.config = newConfig
         }
         .onAppear {
-            print("📱 ContentView appeared.")
-            print("📱 hasCompletedOnboarding (from UserDefaults): \(hasCompletedOnboarding)")
-            print("📱 showOnboarding state: \(showOnboarding)")
-            
-            // IMPORTANT: Force show onboarding on first launch
+            // Show onboarding only on first launch
             if !hasCompletedOnboarding {
-                print("📱 ✅ First launch detected - will show onboarding")
-                // Show immediately without delay
                 showOnboarding = true
-                return // Don't show device sheet if showing onboarding
-            } else {
-                print("📱 ℹ️ Not first launch - onboarding already completed")
+                hasCompletedOnboarding = true
             }
             
-            // Automatically show device selection sheet on first launch (after onboarding)
+            // Automatically show device selection sheet on first launch
             if !hasShownInitialSheet && !bleManager.isConnected {
                 hasShownInitialSheet = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {

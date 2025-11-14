@@ -69,6 +69,7 @@ struct OnboardingView: View {
                             }
                         }
                         .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                        .font(.system(size: 16, weight: .semibold))
                     }
                     
                     Spacer()
@@ -80,6 +81,7 @@ struct OnboardingView: View {
                             }
                         }
                         .foregroundColor(.white)
+                        .font(.system(size: 16, weight: .semibold))
                         .padding(.horizontal, 32)
                         .padding(.vertical, 12)
                         .background(Color(red: 0.4, green: 0.2, blue: 0.6))
@@ -90,6 +92,7 @@ struct OnboardingView: View {
                             showOnboarding = false
                         }
                         .foregroundColor(.white)
+                        .font(.system(size: 16, weight: .semibold))
                         .padding(.horizontal, 32)
                         .padding(.vertical, 12)
                         .background(Color(red: 0.4, green: 0.2, blue: 0.6))

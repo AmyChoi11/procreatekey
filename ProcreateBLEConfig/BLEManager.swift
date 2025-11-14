@@ -1,5 +1,6 @@
 import Foundation
 import CoreBluetooth
+import SwiftUI
 
 class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     @Published var devices: [CBPeripheral] = []
@@ -171,9 +172,9 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
         }
         
         // Filter out devices with very weak signal
-        guard RSSI.intValue > -90 else { 
+        guard RSSI.intValue > -90 else {
             print("   ❌ Rejected: Signal too weak")
-            return 
+            return
         }
         
         // Check if device name starts with "XIAO"
@@ -181,10 +182,6 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
             print("   ❌ Rejected: Name doesn't start with 'XIAO'")
             return
         }
-        
-        // MODELESS DESIGN: Config service is always available
-        // No need to filter by advertised services anymore
-        // Just show all XIAO devices - they all have config service!
         
         // Only add if not already in list
         if !devices.contains(where: { $0.identifier == peripheral.identifier }) {
@@ -237,9 +234,9 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
             return
         }
         
-        guard let services = peripheral.services else { 
+        guard let services = peripheral.services else {
             statusMessage = "No services found"
-            return 
+            return
         }
         
         print("🔍 Found \(services.count) services:")
@@ -335,5 +332,7 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
     
     deinit {
         scanTimer?.invalidate()
+        noDevicesTimer?.invalidate()
+        connectionTimeout?.invalidate()
     }
 }
