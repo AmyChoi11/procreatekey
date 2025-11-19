@@ -65,22 +65,20 @@ struct InteractiveTutorialView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
+                // Dark overlay
+                Color.black.opacity(0.7)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        if steps[currentStep].highlightArea != nil {
+                            nextStep()
+                        }
+                    }
+                
                 // Main content
                 if let highlightArea = steps[currentStep].highlightArea {
-                    // Dark overlay with cutout for highlighted element
-                    DarkOverlayWithCutout(
-                        highlightArea: highlightArea,
-                        geometry: geometry,
-                        onTap: nextStep
-                    )
-                    
                     // Interactive highlight mode
                     highlightView(for: highlightArea, in: geometry)
                 } else {
-                    // Full dark overlay for info card mode
-                    Color.black.opacity(0.7)
-                        .ignoresSafeArea()
-                    
                     // Info card mode
                     infoCardView()
                 }
@@ -327,84 +325,6 @@ enum HighlightArea {
     case button2
     case scroll
     case combo
-}
-
-// Dark overlay with cutout effect
-struct DarkOverlayWithCutout: View {
-    let highlightArea: HighlightArea
-    let geometry: GeometryProxy
-    let onTap: () -> Void
-    
-    var body: some View {
-        let (position, size, isCircle) = getHighlightParameters()
-        
-        Canvas { context, canvasSize in
-            // Fill entire canvas with dark overlay
-            context.fill(
-                Path(CGRect(origin: .zero, size: canvasSize)),
-                with: .color(.black.opacity(0.7))
-            )
-            
-            // Create cutout (transparent hole) for highlighted element
-            let cutoutPath: Path
-            if isCircle {
-                cutoutPath = Path(ellipseIn: CGRect(
-                    x: position.x - 8,
-                    y: position.y - 8,
-                    width: size.width + 16,
-                    height: size.height + 16
-                ))
-            } else {
-                cutoutPath = Path(roundedRect: CGRect(
-                    x: position.x - 8,
-                    y: position.y - 8,
-                    width: size.width + 16,
-                    height: size.height + 16
-                ), cornerRadius: 12)
-            }
-            
-            // Blend mode to create transparent cutout
-            context.blendMode = .destinationOut
-            context.fill(cutoutPath, with: .color(.white))
-        }
-        .ignoresSafeArea()
-        .onTapGesture {
-            onTap()
-        }
-    }
-    
-    private func getHighlightParameters() -> (position: CGPoint, size: CGSize, isCircle: Bool) {
-        let screenWidth = geometry.size.width
-        let screenHeight = geometry.size.height
-        
-        switch highlightArea {
-        case .scanButton:
-            return (CGPoint(x: 8, y: 50), CGSize(width: 48, height: 48), false)
-            
-        case .button1:
-            let centerX = screenWidth * 0.3
-            let centerY = screenHeight * 0.25
-            let diameter: CGFloat = 80
-            return (CGPoint(x: centerX - diameter/2, y: centerY - diameter/2), CGSize(width: diameter, height: diameter), true)
-            
-        case .button2:
-            let centerX = screenWidth * 0.7
-            let centerY = screenHeight * 0.25
-            let diameter: CGFloat = 80
-            return (CGPoint(x: centerX - diameter/2, y: centerY - diameter/2), CGSize(width: diameter, height: diameter), true)
-            
-        case .scroll:
-            let centerX = screenWidth * 0.5
-            let centerY = screenHeight * 0.32
-            let width: CGFloat = 120
-            let height: CGFloat = 50
-            return (CGPoint(x: centerX - width/2, y: centerY - height/2), CGSize(width: width, height: height), false)
-            
-        case .combo:
-            let y = screenHeight * 0.7
-            return (CGPoint(x: 20, y: y), CGSize(width: screenWidth - 40, height: 60), false)
-        }
-    }
 }
 
 // Preview
