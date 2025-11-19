@@ -65,8 +65,8 @@ struct InteractiveTutorialView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                // Dark overlay (40% dark, 60% transparent to see content)
-                Color.black.opacity(0.4)
+                // Light overlay (20% dark, 80% transparent to see content clearly)
+                Color.black.opacity(0.2)
                     .ignoresSafeArea()
                     .onTapGesture {
                         // Tap anywhere to advance (for highlight steps)

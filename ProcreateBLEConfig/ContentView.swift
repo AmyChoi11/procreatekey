@@ -471,17 +471,17 @@ struct ContentView: View {
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
         }
-        .sheet(isPresented: $showDeviceSheet) {
-            DeviceSelectionSheet(bleManager: bleManager, showDeviceSheet: $showDeviceSheet)
-        }
-        .sheet(isPresented: $showOnboarding) {
-            OnboardingView(showOnboarding: $showOnboarding)
-        }
         .fullScreenCover(isPresented: $showInteractiveTutorial) {
             InteractiveTutorialView(
                 showTutorial: $showInteractiveTutorial,
                 hasCompletedOnboarding: $hasCompletedOnboarding
             )
+        }
+        .sheet(isPresented: $showDeviceSheet) {
+            DeviceSelectionSheet(bleManager: bleManager, showDeviceSheet: $showDeviceSheet)
+        }
+        .sheet(isPresented: $showOnboarding) {
+            OnboardingView(showOnboarding: $showOnboarding)
         }
         .sheet(isPresented: $showHelp) {
             HelpView()
