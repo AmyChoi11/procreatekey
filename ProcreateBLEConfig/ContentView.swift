@@ -518,17 +518,16 @@ struct ContentView: View {
             // Show interactive tutorial only on first launch
             if !hasCompletedOnboarding {
                 print("📱 🎓 Showing interactive tutorial for first time!")
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    showInteractiveTutorial = true
-                }
-            }
-            
-            // Automatically show device selection sheet on first launch
-            if !hasShownInitialSheet && !bleManager.isConnected {
-                hasShownInitialSheet = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    bleManager.startScan()
-                    showDeviceSheet = true
+                // Show tutorial immediately on first launch
+                showInteractiveTutorial = true
+            } else {
+                // Only show device selection sheet if onboarding is complete
+                if !hasShownInitialSheet && !bleManager.isConnected {
+                    hasShownInitialSheet = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        bleManager.startScan()
+                        showDeviceSheet = true
+                    }
                 }
             }
         }
