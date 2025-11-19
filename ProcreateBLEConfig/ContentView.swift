@@ -14,6 +14,13 @@ struct ContentView: View {
     @State private var showInteractiveTutorial = false
     @State private var showHelp = false
     
+    // Store actual view frames for tutorial
+    @State private var button1Frame: CGRect = .zero
+    @State private var button2Frame: CGRect = .zero
+    @State private var scrollFrame: CGRect = .zero
+    @State private var comboFrame: CGRect = .zero
+    @State private var scanButtonFrame: CGRect = .zero
+    
     // State for showing dropdowns
     @State private var showScrollDropdown = false
     @State private var showButton1Dropdown = false
@@ -121,6 +128,12 @@ struct ContentView: View {
                                             .cornerRadius(8)
                                     }
                                     .buttonStyle(PlainButtonStyle())
+                                    .background(GeometryReader { geo in
+                                        Color.clear.preference(key: ComboFrameKey.self, value: geo.frame(in: .global))
+                                    })
+                                    .onPreferenceChange(ComboFrameKey.self) { frame in
+                                        comboFrame = frame
+                                    }
                                     .popover(isPresented: $showComboDropdown, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
                                         VStack(spacing: 0) {
                                             ForEach(buttons12Options, id: \.self) { option in
@@ -175,6 +188,12 @@ struct ContentView: View {
                                                     )
                                             }
                                             .buttonStyle(PlainButtonStyle())
+                                            .background(GeometryReader { geo in
+                                                Color.clear.preference(key: ViewFrameKey.self, value: geo.frame(in: .global))
+                                            })
+                                            .onPreferenceChange(ViewFrameKey.self) { frame in
+                                                button1Frame = frame
+                                            }
                                             .popover(isPresented: $showButton1Dropdown, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
                                                 VStack(spacing: 0) {
                                                     ForEach(circleButton1Options, id: \.self) { option in
@@ -234,6 +253,12 @@ struct ContentView: View {
                                                 }
                                             }
                                             .buttonStyle(PlainButtonStyle())
+                                            .background(GeometryReader { geo in
+                                                Color.clear.preference(key: ScrollFrameKey.self, value: geo.frame(in: .global))
+                                            })
+                                            .onPreferenceChange(ScrollFrameKey.self) { frame in
+                                                scrollFrame = frame
+                                            }
                                             .popover(isPresented: $showScrollDropdown, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
                                                 VStack(spacing: 0) {
                                                     ForEach(scrollOptions, id: \.self) { option in
@@ -290,6 +315,12 @@ struct ContentView: View {
                                                     )
                                             }
                                             .buttonStyle(PlainButtonStyle())
+                                            .background(GeometryReader { geo in
+                                                Color.clear.preference(key: Button2FrameKey.self, value: geo.frame(in: .global))
+                                            })
+                                            .onPreferenceChange(Button2FrameKey.self) { frame in
+                                                button2Frame = frame
+                                            }
                                             .popover(isPresented: $showButton2Dropdown, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
                                                 VStack(spacing: 0) {
                                                     ForEach(circleButton2Options, id: \.self) { option in
@@ -423,6 +454,12 @@ struct ContentView: View {
                             )
                         }
                         .disabled(bleManager.isScanning)
+                        .background(GeometryReader { geo in
+                            Color.clear.preference(key: ScanButtonFrameKey.self, value: geo.frame(in: .global))
+                        })
+                        .onPreferenceChange(ScanButtonFrameKey.self) { frame in
+                            scanButtonFrame = frame
+                        }
                         
                         // Help button
                         Button(action: { showHelp = true }) {
@@ -475,7 +512,12 @@ struct ContentView: View {
             if showInteractiveTutorial {
                 InteractiveTutorialView(
                     showTutorial: $showInteractiveTutorial,
-                    hasCompletedOnboarding: $hasCompletedOnboarding
+                    hasCompletedOnboarding: $hasCompletedOnboarding,
+                    scanButtonFrame: scanButtonFrame,
+                    button1Frame: button1Frame,
+                    button2Frame: button2Frame,
+                    scrollFrame: scrollFrame,
+                    comboFrame: comboFrame
                 )
             }
         }
@@ -868,6 +910,42 @@ struct ContentView: View {
         print("📤 Saving configuration:")
         print("  Full config: \(config)")
         bleManager.writeConfig(config: config)
+    }
+}
+
+// PreferenceKey for tracking view frames
+struct ViewFrameKey: PreferenceKey {
+    static var defaultValue: CGRect = .zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        value = nextValue()
+    }
+}
+
+struct ComboFrameKey: PreferenceKey {
+    static var defaultValue: CGRect = .zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        value = nextValue()
+    }
+}
+
+struct ScrollFrameKey: PreferenceKey {
+    static var defaultValue: CGRect = .zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        value = nextValue()
+    }
+}
+
+struct Button2FrameKey: PreferenceKey {
+    static var defaultValue: CGRect = .zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        value = nextValue()
+    }
+}
+
+struct ScanButtonFrameKey: PreferenceKey {
+    static var defaultValue: CGRect = .zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        value = nextValue()
     }
 }
 

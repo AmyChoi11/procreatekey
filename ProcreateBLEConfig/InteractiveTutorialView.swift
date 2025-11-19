@@ -4,6 +4,13 @@ struct InteractiveTutorialView: View {
     @Binding var showTutorial: Bool
     @Binding var hasCompletedOnboarding: Bool
     
+    // Frame tracking from ContentView
+    let scanButtonFrame: CGRect
+    let button1Frame: CGRect
+    let button2Frame: CGRect
+    let scrollFrame: CGRect
+    let comboFrame: CGRect
+    
     // Namespace for matched geometry
     @Namespace private var tutorialNamespace
     
@@ -252,40 +259,51 @@ struct InteractiveTutorialView: View {
     }
     
     private func getHighlightParameters(for area: HighlightArea, in geometry: GeometryProxy) -> (position: CGPoint, size: CGSize, isCircle: Bool) {
-        let screenWidth = geometry.size.width
-        let screenHeight = geometry.size.height
-        
         switch area {
         case .scanButton:
-            // Top-left scan button
-            return (CGPoint(x: 8, y: 50), CGSize(width: 48, height: 48), false)
+            // Use actual scan button frame with padding
+            let padding: CGFloat = 8
+            return (
+                CGPoint(x: scanButtonFrame.minX - padding, y: scanButtonFrame.minY - padding),
+                CGSize(width: scanButtonFrame.width + padding * 2, height: scanButtonFrame.height + padding * 2),
+                false
+            )
             
         case .button1:
-            // Blue circle button (left side of controller)
-            let centerX = screenWidth * 0.3
-            let centerY = screenHeight * 0.25
-            let diameter: CGFloat = 80
-            return (CGPoint(x: centerX - diameter/2, y: centerY - diameter/2), CGSize(width: diameter, height: diameter), true)
+            // Use actual button1 frame - it's a circle
+            let padding: CGFloat = 10
+            return (
+                CGPoint(x: button1Frame.minX - padding, y: button1Frame.minY - padding),
+                CGSize(width: button1Frame.width + padding * 2, height: button1Frame.height + padding * 2),
+                true
+            )
             
         case .button2:
-            // Red circle button (right side of controller)
-            let centerX = screenWidth * 0.7
-            let centerY = screenHeight * 0.25
-            let diameter: CGFloat = 80
-            return (CGPoint(x: centerX - diameter/2, y: centerY - diameter/2), CGSize(width: diameter, height: diameter), true)
+            // Use actual button2 frame - it's a circle
+            let padding: CGFloat = 10
+            return (
+                CGPoint(x: button2Frame.minX - padding, y: button2Frame.minY - padding),
+                CGSize(width: button2Frame.width + padding * 2, height: button2Frame.height + padding * 2),
+                true
+            )
             
         case .scroll:
-            // Purple scroll wheel (center bottom of controller)
-            let centerX = screenWidth * 0.5
-            let centerY = screenHeight * 0.32
-            let width: CGFloat = 120
-            let height: CGFloat = 50
-            return (CGPoint(x: centerX - width/2, y: centerY - height/2), CGSize(width: width, height: height), false)
+            // Use actual scroll frame - it's a capsule/pill shape
+            let padding: CGFloat = 10
+            return (
+                CGPoint(x: scrollFrame.minX - padding, y: scrollFrame.minY - padding),
+                CGSize(width: scrollFrame.width + padding * 2, height: scrollFrame.height + padding * 2),
+                false
+            )
             
         case .combo:
-            // Combo button in the list (approximate position)
-            let y = screenHeight * 0.7
-            return (CGPoint(x: 20, y: y), CGSize(width: screenWidth - 40, height: 60), false)
+            // Use actual combo button frame
+            let padding: CGFloat = 8
+            return (
+                CGPoint(x: comboFrame.minX - padding, y: comboFrame.minY - padding),
+                CGSize(width: comboFrame.width + padding * 2, height: comboFrame.height + padding * 2),
+                false
+            )
         }
     }
     
@@ -332,7 +350,12 @@ struct InteractiveTutorialView_Previews: PreviewProvider {
     static var previews: some View {
         InteractiveTutorialView(
             showTutorial: .constant(true),
-            hasCompletedOnboarding: .constant(false)
+            hasCompletedOnboarding: .constant(false),
+            scanButtonFrame: CGRect(x: 20, y: 50, width: 100, height: 40),
+            button1Frame: CGRect(x: 100, y: 300, width: 80, height: 80),
+            button2Frame: CGRect(x: 250, y: 300, width: 80, height: 80),
+            scrollFrame: CGRect(x: 180, y: 380, width: 60, height: 100),
+            comboFrame: CGRect(x: 20, y: 500, width: 350, height: 60)
         )
     }
 }
