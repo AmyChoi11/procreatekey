@@ -435,6 +435,7 @@ struct ContentView: View {
                                 Image(systemName: "bluetooth")
                                     .font(.system(size: 16, weight: .medium))
                                     .foregroundColor(bleManager.isConnected ? Color.green : Color(red: 0.4, green: 0.2, blue: 0.6))
+                                    .imageScale(.medium)
                                 Text(bleManager.isConnected ? "Connected" : "Scan")
                                     .font(.system(size: 15, weight: .semibold))
                                     .foregroundColor(bleManager.isConnected ? Color.green : Color(red: 0.4, green: 0.2, blue: 0.6))
