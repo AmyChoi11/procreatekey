@@ -261,47 +261,66 @@ struct InteractiveTutorialView: View {
     private func getHighlightParameters(for area: HighlightArea, in geometry: GeometryProxy) -> (position: CGPoint, size: CGSize, isCircle: Bool) {
         switch area {
         case .scanButton:
-            // Use actual scan button frame with padding
+            // Use actual scan button frame dimensions
             let padding: CGFloat = 8
+            let centerX = scanButtonFrame.midX
+            let centerY = scanButtonFrame.midY
+            let width = scanButtonFrame.width + padding * 2
+            let height = scanButtonFrame.height + padding * 2
+            // Position is top-left corner for the frame calculation
             return (
-                CGPoint(x: scanButtonFrame.minX - padding, y: scanButtonFrame.minY - padding),
-                CGSize(width: scanButtonFrame.width + padding * 2, height: scanButtonFrame.height + padding * 2),
+                CGPoint(x: centerX - width / 2, y: centerY - height / 2),
+                CGSize(width: width, height: height),
                 false
             )
             
         case .button1:
-            // Use actual button1 frame - it's a circle
+            // Use actual button1 frame - it's a circle, so use diameter
             let padding: CGFloat = 10
+            let centerX = button1Frame.midX
+            let centerY = button1Frame.midY
+            let diameter = button1Frame.width + padding * 2
             return (
-                CGPoint(x: button1Frame.minX - padding, y: button1Frame.minY - padding),
-                CGSize(width: button1Frame.width + padding * 2, height: button1Frame.height + padding * 2),
+                CGPoint(x: centerX - diameter / 2, y: centerY - diameter / 2),
+                CGSize(width: diameter, height: diameter),
                 true
             )
             
         case .button2:
-            // Use actual button2 frame - it's a circle
+            // Use actual button2 frame - it's a circle, so use diameter
             let padding: CGFloat = 10
+            let centerX = button2Frame.midX
+            let centerY = button2Frame.midY
+            let diameter = button2Frame.width + padding * 2
             return (
-                CGPoint(x: button2Frame.minX - padding, y: button2Frame.minY - padding),
-                CGSize(width: button2Frame.width + padding * 2, height: button2Frame.height + padding * 2),
+                CGPoint(x: centerX - diameter / 2, y: centerY - diameter / 2),
+                CGSize(width: diameter, height: diameter),
                 true
             )
             
         case .scroll:
             // Use actual scroll frame - it's a capsule/pill shape
             let padding: CGFloat = 10
+            let centerX = scrollFrame.midX
+            let centerY = scrollFrame.midY
+            let width = scrollFrame.width + padding * 2
+            let height = scrollFrame.height + padding * 2
             return (
-                CGPoint(x: scrollFrame.minX - padding, y: scrollFrame.minY - padding),
-                CGSize(width: scrollFrame.width + padding * 2, height: scrollFrame.height + padding * 2),
+                CGPoint(x: centerX - width / 2, y: centerY - height / 2),
+                CGSize(width: width, height: height),
                 false
             )
             
         case .combo:
             // Use actual combo button frame
             let padding: CGFloat = 8
+            let centerX = comboFrame.midX
+            let centerY = comboFrame.midY
+            let width = comboFrame.width + padding * 2
+            let height = comboFrame.height + padding * 2
             return (
-                CGPoint(x: comboFrame.minX - padding, y: comboFrame.minY - padding),
-                CGSize(width: comboFrame.width + padding * 2, height: comboFrame.height + padding * 2),
+                CGPoint(x: centerX - width / 2, y: centerY - height / 2),
+                CGSize(width: width, height: height),
                 false
             )
         }
