@@ -432,8 +432,8 @@ struct ContentView: View {
                             }
                         }) {
                             HStack(spacing: 6) {
-                                Image(systemName: bleManager.isConnected ? "antenna.radiowaves.left.and.right" : "wave.3.right")
-                                    .font(.system(size: 16, weight: .medium))
+                                Text("␢")
+                                    .font(.system(size: 18, weight: .bold))
                                     .foregroundColor(bleManager.isConnected ? Color.green : Color(red: 0.4, green: 0.2, blue: 0.6))
                                 Text(bleManager.isConnected ? "Connected" : "Scan")
                                     .font(.system(size: 15, weight: .semibold))
