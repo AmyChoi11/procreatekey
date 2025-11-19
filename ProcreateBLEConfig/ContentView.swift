@@ -512,9 +512,15 @@ struct ContentView: View {
             self.config = newConfig
         }
         .onAppear {
+            print("📱 ContentView appeared")
+            print("📱 hasCompletedOnboarding: \(hasCompletedOnboarding)")
+            
             // Show interactive tutorial only on first launch
             if !hasCompletedOnboarding {
-                showInteractiveTutorial = true
+                print("📱 🎓 Showing interactive tutorial for first time!")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    showInteractiveTutorial = true
+                }
             }
             
             // Automatically show device selection sheet on first launch
@@ -597,6 +603,26 @@ struct ContentView: View {
                         Divider()
                     }
                 }
+            }
+            
+            Divider()
+            
+            // Show Tutorial button
+            Button(action: {
+                showPresetDropdown = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    showInteractiveTutorial = true
+                }
+            }) {
+                HStack {
+                    Image(systemName: "lightbulb.fill")
+                        .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                    Text("Show Tutorial")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                }
+                .padding()
+                .frame(maxWidth: .infinity)
             }
         }
         .background(Color.white)
