@@ -516,19 +516,25 @@ struct ContentView: View {
         .onAppear {
             print("📱 ContentView appeared")
             print("📱 hasCompletedOnboarding: \(hasCompletedOnboarding)")
+            print("📱 showInteractiveTutorial: \(showInteractiveTutorial)")
+            print("📱 showDeviceSheet: \(showDeviceSheet)")
             
             // Show interactive tutorial only on first launch
             if !hasCompletedOnboarding {
                 print("📱 🎓 Showing interactive tutorial for first time!")
-                // Show tutorial immediately on first launch
-                showInteractiveTutorial = true
+                // Delay slightly to ensure view is ready
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    showInteractiveTutorial = true
+                    print("📱 ✅ showInteractiveTutorial set to true")
+                }
             } else {
                 // Only show device selection sheet if onboarding is complete
                 if !hasShownInitialSheet && !bleManager.isConnected {
                     hasShownInitialSheet = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         bleManager.startScan()
                         showDeviceSheet = true
+                        print("📱 📡 Device sheet shown")
                     }
                 }
             }
@@ -621,6 +627,25 @@ struct ContentView: View {
                     Text("Show Tutorial")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                }
+                .padding()
+                .frame(maxWidth: .infinity)
+            }
+            
+            Divider()
+            
+            // Reset Tutorial button (for testing)
+            Button(action: {
+                showPresetDropdown = false
+                hasCompletedOnboarding = false
+                print("📱 🔄 Tutorial reset - will show on next launch")
+            }) {
+                HStack {
+                    Image(systemName: "arrow.counterclockwise")
+                        .foregroundColor(.orange)
+                    Text("Reset Tutorial")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.orange)
                 }
                 .padding()
                 .frame(maxWidth: .infinity)
