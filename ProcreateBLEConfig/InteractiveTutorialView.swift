@@ -65,8 +65,8 @@ struct InteractiveTutorialView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                // Dark overlay
-                Color.black.opacity(0.7)
+                // Dark overlay (85% like Flutter)
+                Color.black.opacity(0.85)
                     .ignoresSafeArea()
                     .onTapGesture {
                         if steps[currentStep].highlightArea != nil {
@@ -177,7 +177,7 @@ struct InteractiveTutorialView: View {
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color(red: 0.4, green: 0.2, blue: 0.6))
-                .shadow(color: .black.opacity(0.3), radius: 15, x: 0, y: 5)
+                .shadow(color: .black.opacity(1.0), radius: 15, x: 0, y: 5)
         )
         .position(x: geometry.size.width / 2, y: tooltipY + tooltipHeight / 2)
         .onTapGesture {

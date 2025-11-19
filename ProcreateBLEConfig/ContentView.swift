@@ -471,11 +471,13 @@ struct ContentView: View {
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
         }
-        .fullScreenCover(isPresented: $showInteractiveTutorial) {
-            InteractiveTutorialView(
-                showTutorial: $showInteractiveTutorial,
-                hasCompletedOnboarding: $hasCompletedOnboarding
-            )
+        .overlay {
+            if showInteractiveTutorial {
+                InteractiveTutorialView(
+                    showTutorial: $showInteractiveTutorial,
+                    hasCompletedOnboarding: $hasCompletedOnboarding
+                )
+            }
         }
         .sheet(isPresented: $showDeviceSheet) {
             DeviceSelectionSheet(bleManager: bleManager, showDeviceSheet: $showDeviceSheet)
