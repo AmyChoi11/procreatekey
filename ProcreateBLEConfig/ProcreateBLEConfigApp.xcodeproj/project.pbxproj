@@ -10,7 +10,7 @@
 		A1000001 /* ProcreateBLEConfigApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002 /* ProcreateBLEConfigApp.swift */; };
 		A1000003 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000004 /* ContentView.swift */; };
 		A1000005 /* BLEManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000006 /* BLEManager.swift */; };
-		A1000009 /* InteractiveTutorialView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000A /* InteractiveTutorialView.swift */; };
+		A100000D /* InteractiveTutorialView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000E /* InteractiveTutorialView.swift */; };
 		F1BDAAA42EC2841100F2AF4C /* FINAL_FIX_CONFIRMED.md in Resources */ = {isa = PBXBuildFile; fileRef = F1BDAAA02EC2841100F2AF4C /* FINAL_FIX_CONFIRMED.md */; };
 		F1BDAAA52EC2841100F2AF4C /* GIT_DEPLOYMENT.md in Resources */ = {isa = PBXBuildFile; fileRef = F1BDAAA12EC2841100F2AF4C /* GIT_DEPLOYMENT.md */; };
 		F1BDAAA62EC2841100F2AF4C /* DetectedProblem.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1BDAA9F2EC2841100F2AF4C /* DetectedProblem.swift */; };
@@ -24,7 +24,7 @@
 		A1000006 /* BLEManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BLEManager.swift; sourceTree = SOURCE_ROOT; };
 		A1000007 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = SOURCE_ROOT; };
 		A1000008 /* ProcreateBLEConfig.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ProcreateBLEConfig.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		A100000A /* InteractiveTutorialView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractiveTutorialView.swift; sourceTree = "<group>"; };
+		A100000E /* InteractiveTutorialView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractiveTutorialView.swift; sourceTree = "<group>"; };
 		F1BDAA9F2EC2841100F2AF4C /* DetectedProblem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectedProblem.swift; sourceTree = "<group>"; };
 		F1BDAAA02EC2841100F2AF4C /* FINAL_FIX_CONFIRMED.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = FINAL_FIX_CONFIRMED.md; sourceTree = "<group>"; };
 		F1BDAAA12EC2841100F2AF4C /* GIT_DEPLOYMENT.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = GIT_DEPLOYMENT.md; sourceTree = "<group>"; };
@@ -51,7 +51,7 @@
 				F1BDAAA12EC2841100F2AF4C /* GIT_DEPLOYMENT.md */,
 				F1BDAAA22EC2841100F2AF4C /* HelpView.swift */,
 				F1BDAAA32EC2841100F2AF4C /* OnboardingView.swift */,
-				A100000A /* InteractiveTutorialView.swift */,
+				A100000E /* InteractiveTutorialView.swift */,
 				A1000002 /* ProcreateBLEConfigApp.swift */,
 				A1000004 /* ContentView.swift */,
 				A1000006 /* BLEManager.swift */,
@@ -150,7 +150,7 @@
 				F1BDAAA62EC2841100F2AF4C /* DetectedProblem.swift in Sources */,
 				F1BDAAA72EC2841100F2AF4C /* HelpView.swift in Sources */,
 				F1BDAAA82EC2841100F2AF4C /* OnboardingView.swift in Sources */,
-				A1000009 /* InteractiveTutorialView.swift in Sources */,
+				A100000D /* InteractiveTutorialView.swift in Sources */,
 				A1000003 /* ContentView.swift in Sources */,
 				A1000005 /* BLEManager.swift in Sources */,
 			);
