@@ -11,6 +11,7 @@ struct ContentView: View {
     @State private var showDeviceSheet = false
     @State private var hasShownInitialSheet = false
     @State private var showOnboarding = false
+    @State private var showInteractiveTutorial = false
     @State private var showHelp = false
     
     // State for showing dropdowns
@@ -432,8 +433,8 @@ struct ContentView: View {
                         .simultaneousGesture(
                             LongPressGesture(minimumDuration: 2.0)
                                 .onEnded { _ in
-                                    // Long press to show onboarding again
-                                    showOnboarding = true
+                                    // Long press to show interactive tutorial again
+                                    showInteractiveTutorial = true
                                 }
                         )
                     }
@@ -476,6 +477,12 @@ struct ContentView: View {
         .sheet(isPresented: $showOnboarding) {
             OnboardingView(showOnboarding: $showOnboarding)
         }
+        .fullScreenCover(isPresented: $showInteractiveTutorial) {
+            InteractiveTutorialView(
+                showTutorial: $showInteractiveTutorial,
+                hasCompletedOnboarding: $hasCompletedOnboarding
+            )
+        }
         .sheet(isPresented: $showHelp) {
             HelpView()
                 .environmentObject(bleManager)
@@ -505,10 +512,9 @@ struct ContentView: View {
             self.config = newConfig
         }
         .onAppear {
-            // Show onboarding only on first launch
+            // Show interactive tutorial only on first launch
             if !hasCompletedOnboarding {
-                showOnboarding = true
-                hasCompletedOnboarding = true
+                showInteractiveTutorial = true
             }
             
             // Automatically show device selection sheet on first launch
