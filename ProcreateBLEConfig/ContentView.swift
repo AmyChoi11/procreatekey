@@ -432,8 +432,8 @@ struct ContentView: View {
                             }
                         }) {
                             HStack(spacing: 6) {
-                                Text("␢")
-                                    .font(.system(size: 18, weight: .bold))
+                                Image(systemName: "bluetooth")
+                                    .font(.system(size: 16, weight: .medium))
                                     .foregroundColor(bleManager.isConnected ? Color.green : Color(red: 0.4, green: 0.2, blue: 0.6))
                                 Text(bleManager.isConnected ? "Connected" : "Scan")
                                     .font(.system(size: 15, weight: .semibold))
