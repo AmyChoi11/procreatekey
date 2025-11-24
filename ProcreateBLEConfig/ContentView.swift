@@ -69,8 +69,83 @@ struct ContentView: View {
     private let defaultConfig: [String: Int] = ["button1": 3, "button2": 5, "combo": 8, "scroll": 6]  // Undo, Erase, Brush Library, Brush Size 5%
     
     var body: some View {
+        ZStack {
+            mainNavigationView
+                .sheet(isPresented: $showDeviceSheet) {
+                    DeviceSelectionSheet(bleManager: bleManager, showDeviceSheet: $showDeviceSheet)
+                }
+                .sheet(isPresented: $showOnboarding) {
+                    OnboardingView(showOnboarding: $showOnboarding)
+                }
+                .sheet(isPresented: $showHelp) {
+                    HelpView()
+                        .environmentObject(bleManager)
+                }
+                .actionSheet(isPresented: $showSaveCustomAlert) {
+                    saveCustomActionSheet
+                }
+                .onAppear {
+                    handleOnAppear()
+                }
+                .onChange(of: scenePhase) { newPhase in
+                    switch newPhase {
+                    case .background:
+                        print("📱 App going to background, disconnecting...")
+                        if bleManager.isConnected {
+                            bleManager.disconnect()
+                        }
+                    case .inactive:
+                        print("📱 App inactive")
+                    case .active:
+                        print("📱 App active")
+                    @unknown default:
+                        break
+                    }
+                }
+                .onChange(of: bleManager.detectedProblem) { problem in
+                    if problem != nil {
+                        showHelp = true
+                    }
+                }
+            
+            // Tutorial overlay at top level to cover navigation bar
+            if showInteractiveTutorial {
+                InteractiveTutorialView(
+                    showTutorial: $showInteractiveTutorial,
+                    hasCompletedOnboarding: $hasCompletedOnboarding,
+                    scanButtonFrame: scanButtonFrame,
+                    button1Frame: button1Frame,
+                    button2Frame: button2Frame,
+                    scrollFrame: scrollFrame,
+                    comboFrame: comboFrame
+                )
+            }
+        }
+    }
+    
+    private var mainNavigationView: some View {
         NavigationStack {
-            ZStack {
+            mainContentView
+            .toolbar {
+                toolbarContent
+            }
+            .toolbarBackground(Color(red: 0.4, green: 0.2, blue: 0.6), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+        }
+        .onReceive(bleManager.$isConnected) { connected in
+            if connected {
+                showDeviceSheet = false
+            }
+        }
+        .onReceive(bleManager.$currentConfig) { newConfig in
+            print("📥 Loading configuration from device: \(newConfig)")
+            self.config = newConfig
+        }
+    }
+    
+    private var mainContentView: some View {
+        ZStack {
                 // Background color
                 Color(red: 0.95, green: 0.95, blue: 0.97)
                     .ignoresSafeArea()
@@ -453,9 +528,12 @@ struct ContentView: View {
             }
             .navigationTitle("eSketch Shortcuts")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                // Left toolbar - Bluetooth Scan/Connect button styled like Customs
-                ToolbarItem(placement: .navigationBarLeading) {
+    }
+    
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        // Left toolbar - Bluetooth Scan/Connect button styled like Customs
+        ToolbarItem(placement: .navigationBarLeading) {
                     HStack(spacing: 10) {
                         // Bluetooth button styled like Customs
                         Button(action: {
@@ -467,8 +545,8 @@ struct ContentView: View {
                             }
                         }) {
                             HStack(spacing: 8) {
-                                Image(systemName: bleManager.isConnected ? "antenna.radiowaves.left.and.right" : "antenna.radiowaves.left.and.right")
-                                    .font(.system(size: 14, weight: .semibold))
+                                Image(systemName: "dot.radiowaves.left.and.right")
+                                    .font(.system(size: 16, weight: .semibold))
                                     .foregroundColor(bleManager.isConnected ? Color.green : Color(red: 0.4, green: 0.2, blue: 0.6))
                                 Text(bleManager.isConnected ? "Connected" : "Scan")
                                     .font(.system(size: 15, weight: .semibold))
@@ -497,25 +575,21 @@ struct ContentView: View {
                         .onPreferenceChange(ScanButtonFrameKey.self) { frame in
                             scanButtonFrame = frame
                         }
-                        
-                        // Help button with dropdown
-                        Menu {
-                            Button(action: {
-                                showHelp = true
-                            }) {
-                                Label("FAQ", systemImage: "questionmark.circle.fill")
-                            }
-                            
-                            Button(action: {
-                                showInteractiveTutorial = true
-                            }) {
-                                Label("First Time Guide", systemImage: "book.circle.fill")
-                            }
-                        } label: {
-                            Image(systemName: "questionmark.circle")
-                                .foregroundColor(.white)
-                                .font(.system(size: 18))
-                        }
+                    }
+                }
+                
+                // Help button in separate ToolbarItem for proper popover positioning
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        showHelpDropdown = true
+                    }) {
+                        Image(systemName: "questionmark.circle")
+                            .foregroundColor(.white)
+                            .font(.system(size: 18))
+                    }
+                    .popover(isPresented: $showHelpDropdown, arrowEdge: .top) {
+                        helpMenuView
+                            .presentationCompactAdaptation(.popover)
                     }
                 }
                 
@@ -566,102 +640,48 @@ struct ContentView: View {
                         customMenuView
                     }
                 }
+        }
+    
+    private var saveCustomActionSheet: ActionSheet {
+        ActionSheet(
+            title: Text("Save Current Configuration"),
+            message: Text("Choose a custom slot to save your current configuration"),
+            buttons: [
+                .default(Text("Save as Custom 1")) {
+                    saveCustom(slot: 1)
+                },
+                .default(Text("Save as Custom 2")) {
+                    saveCustom(slot: 2)
+                },
+                .cancel()
+            ]
+        )
+    }
+    
+    // MARK: - Lifecycle Methods
+    private func handleOnAppear() {
+        print("📱 ContentView appeared")
+        print("📱 hasCompletedOnboarding: \(hasCompletedOnboarding)")
+        print("📱 showInteractiveTutorial: \(showInteractiveTutorial)")
+        print("📱 showDeviceSheet: \(showDeviceSheet)")
+        
+        // Show interactive tutorial only on first launch
+        if !hasCompletedOnboarding {
+            print("📱 🎓 Showing interactive tutorial for first time!")
+            // Delay slightly to ensure view is ready
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                showInteractiveTutorial = true
+                print("📱 ✅ showInteractiveTutorial set to true")
             }
-            .toolbarBackground(Color(red: 0.4, green: 0.2, blue: 0.6), for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
-        }
-        .overlay {
-            if showInteractiveTutorial {
-                InteractiveTutorialView(
-                    showTutorial: $showInteractiveTutorial,
-                    hasCompletedOnboarding: $hasCompletedOnboarding,
-                    scanButtonFrame: scanButtonFrame,
-                    button1Frame: button1Frame,
-                    button2Frame: button2Frame,
-                    scrollFrame: scrollFrame,
-                    comboFrame: comboFrame
-                )
-            }
-        }
-        .sheet(isPresented: $showDeviceSheet) {
-            DeviceSelectionSheet(bleManager: bleManager, showDeviceSheet: $showDeviceSheet)
-        }
-        .sheet(isPresented: $showOnboarding) {
-            OnboardingView(showOnboarding: $showOnboarding)
-        }
-        .sheet(isPresented: $showHelp) {
-            HelpView()
-                .environmentObject(bleManager)
-        }
-        .actionSheet(isPresented: $showSaveCustomAlert) {
-            ActionSheet(
-                title: Text("Save Current Configuration"),
-                message: Text("Choose a custom slot to save your current configuration"),
-                buttons: [
-                    .default(Text("Save as Custom 1")) {
-                        saveCustom(slot: 1)
-                    },
-                    .default(Text("Save as Custom 2")) {
-                        saveCustom(slot: 2)
-                    },
-                    .cancel()
-                ]
-            )
-        }
-        .onReceive(bleManager.$isConnected) { connected in
-            if connected {
-                showDeviceSheet = false
-            }
-        }
-        .onReceive(bleManager.$currentConfig) { newConfig in
-            print("📥 Loading configuration from device: \(newConfig)")
-            self.config = newConfig
-        }
-        .onAppear {
-            print("📱 ContentView appeared")
-            print("📱 hasCompletedOnboarding: \(hasCompletedOnboarding)")
-            print("📱 showInteractiveTutorial: \(showInteractiveTutorial)")
-            print("📱 showDeviceSheet: \(showDeviceSheet)")
-            
-            // Show interactive tutorial only on first launch
-            if !hasCompletedOnboarding {
-                print("📱 🎓 Showing interactive tutorial for first time!")
-                // Delay slightly to ensure view is ready
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    showInteractiveTutorial = true
-                    print("📱 ✅ showInteractiveTutorial set to true")
+        } else {
+            // Only show device selection sheet if onboarding is complete
+            if !hasShownInitialSheet && !bleManager.isConnected {
+                hasShownInitialSheet = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    bleManager.startScan()
+                    showDeviceSheet = true
+                    print("📱 📡 Device sheet shown")
                 }
-            } else {
-                // Only show device selection sheet if onboarding is complete
-                if !hasShownInitialSheet && !bleManager.isConnected {
-                    hasShownInitialSheet = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        bleManager.startScan()
-                        showDeviceSheet = true
-                        print("📱 📡 Device sheet shown")
-                    }
-                }
-            }
-        }
-        .onChange(of: scenePhase) { newPhase in
-            switch newPhase {
-            case .background:
-                print("📱 App going to background, disconnecting...")
-                if bleManager.isConnected {
-                    bleManager.disconnect()
-                }
-            case .inactive:
-                print("📱 App inactive")
-            case .active:
-                print("📱 App active")
-            @unknown default:
-                break
-            }
-        }
-        .onChange(of: bleManager.detectedProblem) { problem in
-            if problem != nil {
-                showHelp = true
             }
         }
     }
@@ -728,6 +748,56 @@ struct ContentView: View {
         .cornerRadius(12)
         .shadow(radius: 5)
         .frame(width: 280)
+    }
+    
+    // MARK: - Help Menu View
+    var helpMenuView: some View {
+        VStack(spacing: 0) {
+            Text("Help")
+                .font(.headline)
+                .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                .padding()
+                .frame(maxWidth: .infinity)
+                .background(Color.gray.opacity(0.1))
+            
+            Button(action: {
+                showHelpDropdown = false
+                showHelp = true
+            }) {
+                HStack {
+                    Image(systemName: "questionmark.circle")
+                        .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                    Text("FAQ")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.black)
+                }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.white)
+            }
+            
+            Divider()
+            
+            Button(action: {
+                showHelpDropdown = false
+                showInteractiveTutorial = true
+            }) {
+                HStack {
+                    Image(systemName: "book.circle")
+                        .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                    Text("First Time Guide")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.black)
+                }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.white)
+            }
+        }
+        .background(Color.white)
+        .cornerRadius(12)
+        .shadow(radius: 5)
+        .frame(width: 200)
     }
     
     // MARK: - Custom Functions - RENAMED FROM PRESET
