@@ -71,53 +71,78 @@ struct InteractiveTutorialView: View {
     
     var body: some View {
         GeometryReader { geometry in
-            ZStack {
-                // Dark overlay (85% like Flutter)
-                Color.black.opacity(0.85)
-                    .ignoresSafeArea()
+            // Capture the overlay's position in global coordinates to calculate offset
+            GeometryReader { overlayGeometry in
+                let overlayGlobalFrame = overlayGeometry.frame(in: .global)
+                
+                ZStack {
+                    // Dark overlay (85% like Flutter) with cutouts
+                    ZStack {
+                        Color.black.opacity(0.85)
+                            .ignoresSafeArea()
+                        
+                        // Main content
+                        if let highlightArea = steps[currentStep].highlightArea {
+                            // Interactive highlight mode - pass the offset to adjust coordinates
+                            highlightView(for: highlightArea, in: geometry, overlayOffset: overlayGlobalFrame.origin)
+                        }
+                    }
+                    .compositingGroup()
                     .onTapGesture {
                         if steps[currentStep].highlightArea != nil {
                             nextStep()
                         }
                     }
-                
-                // Main content
-                if let highlightArea = steps[currentStep].highlightArea {
-                    // Interactive highlight mode
-                    highlightView(for: highlightArea, in: geometry)
-                } else {
-                    // Info card mode
-                    infoCardView()
-                }
-                
-                // Skip button
-                VStack {
-                    HStack {
-                        Spacer()
-                        Button(action: skipTutorial) {
-                            Text("Skip")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 10)
-                                .background(Color.white.opacity(0.3))
-                                .cornerRadius(20)
-                        }
-                        .padding(.trailing, 20)
-                        .padding(.top, 50)
+                    
+                    // Info card mode (separate from overlay)
+                    if steps[currentStep].highlightArea == nil {
+                        infoCardView()
                     }
-                    Spacer()
+                    
+                    // Skip button
+                    VStack {
+                        HStack {
+                            Spacer()
+                            Button(action: skipTutorial) {
+                                Text("Skip")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 20)
+                                    .padding(.vertical, 10)
+                                    .background(Color.white.opacity(0.3))
+                                    .cornerRadius(20)
+                            }
+                            .padding(.trailing, 20)
+                            .padding(.top, 50)
+                        }
+                        Spacer()
+                    }
                 }
             }
         }
     }
     
     @ViewBuilder
-    private func highlightView(for area: HighlightArea, in geometry: GeometryProxy) -> some View {
-        let (position, size, isCircle) = getHighlightParameters(for: area, in: geometry)
+    private func highlightView(for area: HighlightArea, in geometry: GeometryProxy, overlayOffset: CGPoint) -> some View {
+        let (position, size, isCircle) = getHighlightParameters(for: area, in: geometry, overlayOffset: overlayOffset)
         
         ZStack {
-            // Highlight with glow
+            // Create cutout mask for the dark overlay by drawing the shape
+            if isCircle {
+                Circle()
+                    .fill(Color.black)
+                    .frame(width: size.width, height: size.height)
+                    .position(x: position.x + size.width / 2, y: position.y + size.height / 2)
+                    .blendMode(.destinationOut)
+            } else {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.black)
+                    .frame(width: size.width, height: size.height)
+                    .position(x: position.x + size.width / 2, y: position.y + size.height / 2)
+                    .blendMode(.destinationOut)
+            }
+            
+            // Highlight border with glow
             Circle()
                 .fill(Color.clear)
                 .frame(width: size.width + 16, height: size.height + 16)
@@ -258,18 +283,19 @@ struct InteractiveTutorialView: View {
         }
     }
     
-    private func getHighlightParameters(for area: HighlightArea, in geometry: GeometryProxy) -> (position: CGPoint, size: CGSize, isCircle: Bool) {
+    private func getHighlightParameters(for area: HighlightArea, in geometry: GeometryProxy, overlayOffset: CGPoint) -> (position: CGPoint, size: CGSize, isCircle: Bool) {
         switch area {
         case .scanButton:
             // Use actual scan button frame dimensions
             let padding: CGFloat = 8
-            let centerX = scanButtonFrame.midX
-            let centerY = scanButtonFrame.midY
+            // Convert from global coordinates to overlay-local coordinates
+            let localX = scanButtonFrame.midX - overlayOffset.x
+            let localY = scanButtonFrame.midY - overlayOffset.y
             let width = scanButtonFrame.width + padding * 2
             let height = scanButtonFrame.height + padding * 2
             // Position is top-left corner for the frame calculation
             return (
-                CGPoint(x: centerX - width / 2, y: centerY - height / 2),
+                CGPoint(x: localX - width / 2, y: localY - height / 2),
                 CGSize(width: width, height: height),
                 false
             )
@@ -277,11 +303,11 @@ struct InteractiveTutorialView: View {
         case .button1:
             // Use actual button1 frame - it's a circle, so use diameter
             let padding: CGFloat = 10
-            let centerX = button1Frame.midX
-            let centerY = button1Frame.midY
+            let localX = button1Frame.midX - overlayOffset.x
+            let localY = button1Frame.midY - overlayOffset.y
             let diameter = button1Frame.width + padding * 2
             return (
-                CGPoint(x: centerX - diameter / 2, y: centerY - diameter / 2),
+                CGPoint(x: localX - diameter / 2, y: localY - diameter / 2),
                 CGSize(width: diameter, height: diameter),
                 true
             )
@@ -289,11 +315,11 @@ struct InteractiveTutorialView: View {
         case .button2:
             // Use actual button2 frame - it's a circle, so use diameter
             let padding: CGFloat = 10
-            let centerX = button2Frame.midX
-            let centerY = button2Frame.midY
+            let localX = button2Frame.midX - overlayOffset.x
+            let localY = button2Frame.midY - overlayOffset.y
             let diameter = button2Frame.width + padding * 2
             return (
-                CGPoint(x: centerX - diameter / 2, y: centerY - diameter / 2),
+                CGPoint(x: localX - diameter / 2, y: localY - diameter / 2),
                 CGSize(width: diameter, height: diameter),
                 true
             )
@@ -301,12 +327,12 @@ struct InteractiveTutorialView: View {
         case .scroll:
             // Use actual scroll frame - it's a capsule/pill shape
             let padding: CGFloat = 10
-            let centerX = scrollFrame.midX
-            let centerY = scrollFrame.midY
+            let localX = scrollFrame.midX - overlayOffset.x
+            let localY = scrollFrame.midY - overlayOffset.y
             let width = scrollFrame.width + padding * 2
             let height = scrollFrame.height + padding * 2
             return (
-                CGPoint(x: centerX - width / 2, y: centerY - height / 2),
+                CGPoint(x: localX - width / 2, y: localY - height / 2),
                 CGSize(width: width, height: height),
                 false
             )
@@ -314,12 +340,12 @@ struct InteractiveTutorialView: View {
         case .combo:
             // Use actual combo button frame
             let padding: CGFloat = 8
-            let centerX = comboFrame.midX
-            let centerY = comboFrame.midY
+            let localX = comboFrame.midX - overlayOffset.x
+            let localY = comboFrame.midY - overlayOffset.y
             let width = comboFrame.width + padding * 2
             let height = comboFrame.height + padding * 2
             return (
-                CGPoint(x: centerX - width / 2, y: centerY - height / 2),
+                CGPoint(x: localX - width / 2, y: localY - height / 2),
                 CGSize(width: width, height: height),
                 false
             )

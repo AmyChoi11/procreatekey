@@ -14,89 +14,97 @@ struct HelpView: View {
                     .ignoresSafeArea()
                 
                 ScrollView {
-                    VStack(spacing: 20) {
-                        if let problem = bleManager.detectedProblem {
+                    VStack(spacing: 30) {
+                        // MARK: - FAQ Section
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("FAQ")
+                                .font(.system(size: 22, weight: .bold))
+                                .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                                .padding(.horizontal)
+                            
+                            if let problem = bleManager.detectedProblem {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    Text("Detected Issue")
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundColor(.secondary)
+                                        .padding(.horizontal)
+                                    
+                                    Button(action: { showDetectedProblem = problem }) {
+                                        HStack(spacing: 16) {
+                                            Image(systemName: "exclamationmark.triangle.fill")
+                                                .font(.system(size: 20))
+                                                .foregroundColor(.orange)
+                                                .frame(width: 40)
+                                            
+                                            VStack(alignment: .leading, spacing: 4) {
+                                                Text(problem.title)
+                                                    .font(.system(size: 16, weight: .semibold))
+                                                    .foregroundColor(.black)
+                                                
+                                                Text("Tap for solution")
+                                                    .font(.system(size: 14))
+                                                    .foregroundColor(.gray)
+                                            }
+                                            
+                                            Spacer()
+                                            
+                                            Image(systemName: "chevron.right")
+                                                .foregroundColor(.gray)
+                                        }
+                                        .padding()
+                                        .background(Color.white)
+                                        .cornerRadius(12)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+                                        )
+                                        .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+                                    }
+                                }
+                                .padding(.horizontal)
+                            }
+                            
                             VStack(alignment: .leading, spacing: 12) {
-                                Text("Detected Issue")
+                                Text("All Issues")
                                     .font(.system(size: 14, weight: .semibold))
                                     .foregroundColor(.secondary)
                                     .padding(.horizontal)
                                 
-                                Button(action: { showDetectedProblem = problem }) {
-                                    HStack(spacing: 16) {
-                                        Image(systemName: "exclamationmark.triangle.fill")
-                                            .font(.system(size: 20))
-                                            .foregroundColor(.orange)
-                                            .frame(width: 40)
-                                        
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(problem.title)
-                                        .font(.system(size: 16, weight: .semibold))
-                                        .foregroundColor(.black)
-                                    
-                                    Text("Tap for solution")
-                                        .font(.system(size: 14))
-                                        .foregroundColor(.gray)
-                                }
-                                        
-                                        Spacer()
-                                        
-                                        Image(systemName: "chevron.right")
-                                            .foregroundColor(.gray)
+                                VStack(spacing: 12) {
+                                    HelpCategoryCard(
+                                        icon: "antenna.radiowaves.left.and.right",
+                                        title: "Connection Issues",
+                                        subtitle: "Cannot find or connect to device"
+                                    ) {
+                                        selectedCategory = .connection
                                     }
-                                    .padding()
-                                    .background(Color.white)
-                                    .cornerRadius(12)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .stroke(Color.orange.opacity(0.3), lineWidth: 1)
-                                    )
-                                    .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+                                    
+                                    HelpCategoryCard(
+                                        icon: "hand.tap",
+                                        title: "Button Problems",
+                                        subtitle: "Buttons not working in Procreate"
+                                    ) {
+                                        selectedCategory = .functionality
+                                    }
+                                    
+                                    HelpCategoryCard(
+                                        icon: "gearshape",
+                                        title: "Configuration Issues",
+                                        subtitle: "Settings not saving or loading"
+                                    ) {
+                                        selectedCategory = .configuration
+                                    }
+                                    
+                                    HelpCategoryCard(
+                                        icon: "antenna.radiowaves.left.and.right.slash",
+                                        title: "Bluetooth Problems",
+                                        subtitle: "Pairing or permission issues"
+                                    ) {
+                                        selectedCategory = .bluetooth
+                                    }
                                 }
-                            }
-                            .padding(.horizontal)
-                        }
-                        
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("All Issues")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(.secondary)
                                 .padding(.horizontal)
-                            
-                            VStack(spacing: 12) {
-                                HelpCategoryCard(
-                                    icon: "antenna.radiowaves.left.and.right",
-                                    title: "Connection Issues",
-                                    subtitle: "Cannot find or connect to device"
-                                ) {
-                                    selectedCategory = .connection
-                                }
-                                
-                                HelpCategoryCard(
-                                    icon: "hand.tap",
-                                    title: "Button Problems",
-                                    subtitle: "Buttons not working in Procreate"
-                                ) {
-                                    selectedCategory = .functionality
-                                }
-                                
-                                HelpCategoryCard(
-                                    icon: "gearshape",
-                                    title: "Configuration Issues",
-                                    subtitle: "Settings not saving or loading"
-                                ) {
-                                    selectedCategory = .configuration
-                                }
-                                
-                                HelpCategoryCard(
-                                    icon: "antenna.radiowaves.left.and.right.slash",
-                                    title: "Bluetooth Problems",
-                                    subtitle: "Pairing or permission issues"
-                                ) {
-                                    selectedCategory = .bluetooth
-                                }
                             }
-                            .padding(.horizontal)
                         }
                     }
                     .padding(.vertical)

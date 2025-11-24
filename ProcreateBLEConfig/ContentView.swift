@@ -6,8 +6,8 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     
-    // Store configuration as numeric codes
-    @State private var config: [String: Int] = ["button1": 3, "button2": 4, "combo": 7, "scroll": 9]  // Undo, Redo, Color Palette, Brush Size 10%
+    // Store configuration as numeric codes - UPDATED DEFAULT SETTINGS
+    @State private var config: [String: Int] = ["button1": 3, "button2": 5, "combo": 8, "scroll": 6]  // Undo, Erase, Brush Library, Brush Size 5%
     @State private var showDeviceSheet = false
     @State private var hasShownInitialSheet = false
     @State private var showOnboarding = false
@@ -26,41 +26,47 @@ struct ContentView: View {
     @State private var showButton1Dropdown = false
     @State private var showButton2Dropdown = false
     @State private var showComboDropdown = false
-    @State private var showPresetDropdown = false
+    @State private var showCustomsDropdown = false
+    @State private var showHelpDropdown = false
     
-    // Preset system
-    @AppStorage("preset1") private var preset1Data: String = ""
-    @AppStorage("preset2") private var preset2Data: String = ""
-    @State private var showSavePresetAlert = false
-    @State private var presetToSave: Int = 1
+    // Preset system - RENAMED TO CUSTOMS
+    @AppStorage("custom1") private var custom1Data: String = ""
+    @AppStorage("custom2") private var custom2Data: String = ""
+    @State private var showSaveCustomAlert = false
+    @State private var customToSave: Int = 1
     
     // Combined options for all buttons (excluding brush size settings for buttons)
     let allButtonOptions = ["Undo", "Redo", "Erase", "Color Palette", "Brush Library"]
     var circleButton1Options: [String] { allButtonOptions }
     var circleButton2Options: [String] { allButtonOptions }
     var buttons12Options: [String] { allButtonOptions }
-    let scrollOptions = ["Brush Size (5%)", "Brush Size (10%)"]
     
-    // Preset structure
-    struct Preset: Identifiable {
+    // UPDATED SCROLL OPTIONS WITH NEW NAMES
+    let scrollOptions = ["Brush Size ±5%", "Brush Size ±10%"]
+    
+    // Preset structure - RENAMED TO CUSTOM
+    struct Custom: Identifiable {
         let id: Int
         let name: String
         let config: [String: Int]
     }
     
-    var presets: [Preset] {
-        var availablePresets: [Preset] = []
+    var customs: [Custom] {
+        var availableCustoms: [Custom] = []
         
-        if let preset1 = loadPreset(from: preset1Data) {
-            availablePresets.append(Preset(id: 1, name: "Preset 1", config: preset1))
+        if let custom1 = loadCustom(from: custom1Data) {
+            availableCustoms.append(Custom(id: 1, name: "Custom 1", config: custom1))
         }
         
-        if let preset2 = loadPreset(from: preset2Data) {
-            availablePresets.append(Preset(id: 2, name: "Preset 2", config: preset2))
+        if let custom2 = loadCustom(from: custom2Data) {
+            availableCustoms.append(Custom(id: 2, name: "Custom 2", config: custom2))
         }
         
-        return availablePresets
+        return availableCustoms
     }
+    
+    // DEFAULT CONFIGURATION
+    private let defaultConfig: [String: Int] = ["button1": 3, "button2": 5, "combo": 8, "scroll": 6]  // Undo, Erase, Brush Library, Brush Size 5%
     
     var body: some View {
         NavigationStack {
@@ -105,75 +111,30 @@ struct ContentView: View {
                                 // Controller Background - Made larger to take up 1/4 of section
                                 RoundedRectangle(cornerRadius: 25)
                                     .fill(Color.white)
-                                    .frame(height: 350) // Increased height for larger diagram
+                                    .frame(height: 410) // Increased height for larger diagram
                                     .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
                                 
-                                // Orange connection lines - Positioned above the outline
+                                // Orange connection lines - Positioned above the outline - MOVED TO BOTTOM
                                 connectionLines
                                 
                                 // Nintendo Switch Controller Outline - With smaller cylindrical grips
                                 controllerOutline
                                 
                                 VStack(spacing: 30) {
-                                    // Top: Buttons 1+2 Combo Text
-                                    Button(action: {
-                                        showComboDropdown = true
-                                    }) {
-                                        Text("Buttons 1 + 2 Combo")
-                                            .font(.system(size: 18, weight: .semibold))
-                                            .foregroundColor(.white)
-                                            .padding(.horizontal, 24)
-                                            .padding(.vertical, 12)
-                                            .background(Color.orange)
-                                            .cornerRadius(8)
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
-                                    .background(GeometryReader { geo in
-                                        Color.clear.preference(key: ComboFrameKey.self, value: geo.frame(in: .global))
-                                    })
-                                    .onPreferenceChange(ComboFrameKey.self) { frame in
-                                        comboFrame = frame
-                                    }
-                                    .popover(isPresented: $showComboDropdown, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
-                                        VStack(spacing: 0) {
-                                            ForEach(buttons12Options, id: \.self) { option in
-                                                Button(action: {
-                                                    config["combo"] = optionToCode(option)
-                                                    saveConfigurationIfConnected()
-                                                    showComboDropdown = false
-                                                }) {
-                                                    Text(option)
-                                                        .foregroundColor(.primary)
-                                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                                        .padding(.horizontal, 16)
-                                                        .padding(.vertical, 12)
-                                                }
-                                                if option != buttons12Options.last {
-                                                    Divider()
-                                                }
-                                            }
-                                        }
-                                        .padding(.vertical, 8)
-                                        .background(Color.white)
-                                        .cornerRadius(12)
-                                        .shadow(radius: 5)
-                                        .frame(width: 180)
-                                    }
-                                    .offset(y: -20)
-                                    
-                                    // Bottom: Button 1 - Scroll - Button 2
-                                    HStack(spacing: 30) { // Changed from 60 to 30 (15 closer on each side)
+                                    // Top: Button 1 - Scroll - Button 2
+                                    HStack(spacing: 10) { // CHANGED FROM 30 TO 10 (MOVED BUTTONS 20 CLOSER ON EACH SIDE)
                                         // Button 1 - Larger
                                         VStack(spacing: 8) {
+                                            // INCREASED SIZE OF CURRENT CONFIG DISPLAY
                                             Text(getCurrentSelection(for: "button1"))
-                                                .font(.system(size: 12, weight: .medium))
+                                                .font(.system(size: 16, weight: .medium)) // Increased from 12 to 16
                                                 .foregroundColor(.blue)
-                                                .padding(.horizontal, 8)
-                                                .padding(.vertical, 4)
+                                                .padding(.horizontal, 12) // Increased padding
+                                                .padding(.vertical, 6) // Increased padding
                                                 .background(Color.blue.opacity(0.1))
-                                                .cornerRadius(4)
+                                                .cornerRadius(6)
                                                 .fixedSize(horizontal: false, vertical: true)
-                                                .frame(maxWidth: 100)
+                                                .frame(maxWidth: 120) // Increased from 100 to 120
                                             
                                             Button(action: {
                                                 showButton1Dropdown = true
@@ -225,17 +186,18 @@ struct ContentView: View {
                                                 .foregroundColor(.blue)
                                         }
                                         
-                                        // Scroll - Pill/Capsule shape
+                                        // Scroll - Pill/Capsule shape WITH UP/DOWN ARROWS
                                         VStack(spacing: 8) {
+                                            // INCREASED SIZE OF CURRENT CONFIG DISPLAY WITH WIDER WIDTH
                                             Text(getCurrentSelection(for: "scroll"))
-                                                .font(.system(size: 12, weight: .medium))
+                                                .font(.system(size: 16, weight: .medium)) // Increased from 12 to 16
                                                 .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
-                                                .padding(.horizontal, 8)
-                                                .padding(.vertical, 4)
+                                                .padding(.horizontal, 12) // Increased padding
+                                                .padding(.vertical, 6) // Increased padding
                                                 .background(Color(red: 0.4, green: 0.2, blue: 0.6).opacity(0.1))
-                                                .cornerRadius(4)
+                                                .cornerRadius(6)
                                                 .fixedSize(horizontal: false, vertical: true)
-                                                .frame(maxWidth: 120)
+                                                .frame(maxWidth: 180) // INCREASED WIDTH from 140 to 180 to fit entire text
                                             
                                             Button(action: {
                                                 showScrollDropdown = true
@@ -250,6 +212,17 @@ struct ContentView: View {
                                                     Capsule()
                                                         .stroke(Color(red: 0.4, green: 0.2, blue: 0.6).opacity(0.5), lineWidth: 4)
                                                         .frame(width: 60, height: 100)
+                                                    
+                                                    // UP/DOWN ARROWS ADDED
+                                                    VStack(spacing: 4) {
+                                                        Image(systemName: "chevron.up")
+                                                            .font(.system(size: 16, weight: .bold))
+                                                            .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                                                        
+                                                        Image(systemName: "chevron.down")
+                                                            .font(.system(size: 16, weight: .bold))
+                                                            .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                                                    }
                                                 }
                                             }
                                             .buttonStyle(PlainButtonStyle())
@@ -292,15 +265,16 @@ struct ContentView: View {
                                         
                                         // Button 2 - Larger
                                         VStack(spacing: 8) {
+                                            // INCREASED SIZE OF CURRENT CONFIG DISPLAY
                                             Text(getCurrentSelection(for: "button2"))
-                                                .font(.system(size: 12, weight: .medium))
+                                                .font(.system(size: 16, weight: .medium)) // Increased from 12 to 16
                                                 .foregroundColor(.red)
-                                                .padding(.horizontal, 8)
-                                                .padding(.vertical, 4)
+                                                .padding(.horizontal, 12) // Increased padding
+                                                .padding(.vertical, 6) // Increased padding
                                                 .background(Color.red.opacity(0.1))
-                                                .cornerRadius(4)
+                                                .cornerRadius(6)
                                                 .fixedSize(horizontal: false, vertical: true)
-                                                .frame(maxWidth: 100)
+                                                .frame(maxWidth: 120) // Increased from 100 to 120
                                             
                                             Button(action: {
                                                 showButton2Dropdown = true
@@ -353,18 +327,78 @@ struct ContentView: View {
                                         }
                                     }
                                     .padding(.top, 20)
+                                    
+                                    // Bottom: Buttons 1+2 Combo Text - MOVED TO BOTTOM
+                                    VStack(spacing: 8) {
+                                        // SWITCHED ORDER: BUTTON NOW ABOVE CONFIG DISPLAY
+                                        Button(action: {
+                                            showComboDropdown = true
+                                        }) {
+                                            Text("Buttons 1 + 2 Combo")
+                                                .font(.system(size: 18, weight: .semibold))
+                                                .foregroundColor(.white)
+                                                .padding(.horizontal, 24)
+                                                .padding(.vertical, 12)
+                                                .background(Color.orange)
+                                                .cornerRadius(8)
+                                        }
+                                        .buttonStyle(PlainButtonStyle())
+                                        .background(GeometryReader { geo in
+                                            Color.clear.preference(key: ComboFrameKey.self, value: geo.frame(in: .global))
+                                        })
+                                        .onPreferenceChange(ComboFrameKey.self) { frame in
+                                            comboFrame = frame
+                                        }
+                                        .popover(isPresented: $showComboDropdown, attachmentAnchor: .point(.top), arrowEdge: .bottom) {
+                                            VStack(spacing: 0) {
+                                                ForEach(buttons12Options, id: \.self) { option in
+                                                    Button(action: {
+                                                        config["combo"] = optionToCode(option)
+                                                        saveConfigurationIfConnected()
+                                                        showComboDropdown = false
+                                                    }) {
+                                                        Text(option)
+                                                            .foregroundColor(.primary)
+                                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                                            .padding(.horizontal, 16)
+                                                            .padding(.vertical, 12)
+                                                    }
+                                                    if option != buttons12Options.last {
+                                                        Divider()
+                                                    }
+                                                }
+                                            }
+                                            .padding(.vertical, 8)
+                                            .background(Color.white)
+                                            .cornerRadius(12)
+                                            .shadow(radius: 5)
+                                            .frame(width: 180)
+                                        }
+                                        
+                                        // CONFIG DISPLAY NOW BELOW THE BUTTON
+                                        Text(getCurrentSelection(for: "combo"))
+                                            .font(.system(size: 16, weight: .medium))
+                                            .foregroundColor(.orange)
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 6)
+                                            .background(Color.orange.opacity(0.1))
+                                            .cornerRadius(6)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                            .frame(maxWidth: 180) // Wider to accommodate combo options
+                                    }
+                                    .offset(y: 20) // Adjusted position for bottom placement
                                 }
                             }
                             .frame(height: 320)
                             
-                            // Save Preset Button - Moved down by 10
+                            // Save Custom Button - RENAMED FROM PRESET
                             Button(action: {
-                                showSavePresetAlert = true
+                                showSaveCustomAlert = true
                             }) {
                                 HStack(spacing: 8) {
                                     Image(systemName: "square.and.arrow.down")
                                         .font(.system(size: 16))
-                                    Text("Save as Preset")
+                                    Text("Save as Custom")
                                         .font(.system(size: 16, weight: .semibold))
                                 }
                                 .foregroundColor(.white)
@@ -373,7 +407,7 @@ struct ContentView: View {
                                 .background(Color.green)
                                 .cornerRadius(10)
                             }
-                            .padding(.top, 10) // Changed from 5 to 10 to move button down by 10
+                            .padding(.top, 60)
                         }
                         .padding(.top, 15) // Added padding to move entire section down by 15
                         .padding(.horizontal)
@@ -391,6 +425,7 @@ struct ContentView: View {
                             .padding()
                             .background(RoundedRectangle(cornerRadius: 12).fill(Color.blue.opacity(0.1)))
                             .padding(.horizontal)
+                            .padding(.top, 60)
                         }
                         
                         // Status Message with Red/Green styling
@@ -419,10 +454,10 @@ struct ContentView: View {
             .navigationTitle("eSketch Shortcuts")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                // Left toolbar - Bluetooth Scan/Connect button styled like Presets
+                // Left toolbar - Bluetooth Scan/Connect button styled like Customs
                 ToolbarItem(placement: .navigationBarLeading) {
                     HStack(spacing: 10) {
-                        // Bluetooth button styled like Presets
+                        // Bluetooth button styled like Customs
                         Button(action: {
                             if bleManager.isConnected {
                                 bleManager.disconnect()
@@ -431,9 +466,9 @@ struct ContentView: View {
                                 showDeviceSheet = true
                             }
                         }) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "bluetooth")
-                                    .font(.system(size: 16, weight: .medium))
+                            HStack(spacing: 8) {
+                                Image(systemName: bleManager.isConnected ? "antenna.radiowaves.left.and.right" : "antenna.radiowaves.left.and.right")
+                                    .font(.system(size: 14, weight: .semibold))
                                     .foregroundColor(bleManager.isConnected ? Color.green : Color(red: 0.4, green: 0.2, blue: 0.6))
                                 Text(bleManager.isConnected ? "Connected" : "Scan")
                                     .font(.system(size: 15, weight: .semibold))
@@ -446,7 +481,7 @@ struct ContentView: View {
                             .overlay(
                                 RoundedRectangle(cornerRadius: 8)
                                     .stroke(
-                                        bleManager.isConnected 
+                                        bleManager.isConnected
                                             ? Color.green.opacity(0.6)
                                             : Color(red: 0.4, green: 0.2, blue: 0.6).opacity(0.6),
                                         lineWidth: 1.5
@@ -454,39 +489,46 @@ struct ContentView: View {
                             )
                         }
                         .disabled(bleManager.isScanning)
-                        .background(GeometryReader { geo in
-                            Color.clear.preference(key: ScanButtonFrameKey.self, value: geo.frame(in: .global))
-                        })
+                        .overlay(
+                            GeometryReader { geo in
+                                Color.clear.preference(key: ScanButtonFrameKey.self, value: geo.frame(in: .global))
+                            }
+                        )
                         .onPreferenceChange(ScanButtonFrameKey.self) { frame in
                             scanButtonFrame = frame
                         }
                         
-                        // Help button
-                        Button(action: { showHelp = true }) {
+                        // Help button with dropdown
+                        Menu {
+                            Button(action: {
+                                showHelp = true
+                            }) {
+                                Label("FAQ", systemImage: "questionmark.circle.fill")
+                            }
+                            
+                            Button(action: {
+                                showInteractiveTutorial = true
+                            }) {
+                                Label("First Time Guide", systemImage: "book.circle.fill")
+                            }
+                        } label: {
                             Image(systemName: "questionmark.circle")
                                 .foregroundColor(.white)
                                 .font(.system(size: 18))
                         }
-                        .simultaneousGesture(
-                            LongPressGesture(minimumDuration: 2.0)
-                                .onEnded { _ in
-                                    // Long press to show interactive tutorial again
-                                    showInteractiveTutorial = true
-                                }
-                        )
                     }
                 }
                 
-                // Right toolbar - Presets button
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    // Preset Menu Button
+                // Right toolbar - Customs button and Reset to Default button
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    // Reset to Default Button - SAME SIZE AS OTHER BUTTONS
                     Button(action: {
-                        showPresetDropdown = true
+                        resetToDefault()
                     }) {
                         HStack(spacing: 6) {
-                            Image(systemName: "list.bullet")
+                            Image(systemName: "arrow.clockwise")
                                 .font(.system(size: 16, weight: .medium))
-                            Text("Presets")
+                            Text("Reset to Default")
                                 .font(.system(size: 15, weight: .semibold))
                         }
                         .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
@@ -499,8 +541,29 @@ struct ContentView: View {
                                 .stroke(Color(red: 0.4, green: 0.2, blue: 0.6).opacity(0.6), lineWidth: 1.5)
                         )
                     }
-                    .popover(isPresented: $showPresetDropdown, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
-                        presetMenuView
+                    
+                    // Customs Menu Button - RENAMED FROM PRESETS
+                    Button(action: {
+                        showCustomsDropdown = true
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "list.bullet")
+                                .font(.system(size: 16, weight: .medium))
+                            Text("Customs")
+                                .font(.system(size: 15, weight: .semibold))
+                        }
+                        .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.white.opacity(0.9))
+                        .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color(red: 0.4, green: 0.2, blue: 0.6).opacity(0.6), lineWidth: 1.5)
+                        )
+                    }
+                    .popover(isPresented: $showCustomsDropdown, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
+                        customMenuView
                     }
                 }
             }
@@ -531,16 +594,16 @@ struct ContentView: View {
             HelpView()
                 .environmentObject(bleManager)
         }
-        .actionSheet(isPresented: $showSavePresetAlert) {
+        .actionSheet(isPresented: $showSaveCustomAlert) {
             ActionSheet(
                 title: Text("Save Current Configuration"),
-                message: Text("Choose a preset slot to save your current configuration"),
+                message: Text("Choose a custom slot to save your current configuration"),
                 buttons: [
-                    .default(Text("Save as Preset 1")) {
-                        savePreset(slot: 1)
+                    .default(Text("Save as Custom 1")) {
+                        saveCustom(slot: 1)
                     },
-                    .default(Text("Save as Preset 2")) {
-                        savePreset(slot: 2)
+                    .default(Text("Save as Custom 2")) {
+                        saveCustom(slot: 2)
                     },
                     .cancel()
                 ]
@@ -603,42 +666,49 @@ struct ContentView: View {
         }
     }
     
-    // MARK: - Preset Menu View
-    var presetMenuView: some View {
+    // MARK: - NEW FUNCTION: Reset to Default
+    func resetToDefault() {
+        self.config = defaultConfig
+        saveConfigurationIfConnected()
+        print("🔄 Reset to default configuration: \(defaultConfig)")
+    }
+    
+    // MARK: - Custom Menu View - RENAMED FROM PRESET
+    var customMenuView: some View {
         VStack(spacing: 0) {
-            Text("Saved Presets")
+            Text("Saved Customs")
                 .font(.headline)
                 .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
                 .padding()
                 .frame(maxWidth: .infinity)
                 .background(Color.gray.opacity(0.1))
             
-            if presets.isEmpty {
-                Text("No presets saved")
+            if customs.isEmpty {
+                Text("No customs saved")
                     .foregroundColor(.secondary)
                     .padding()
             } else {
-                ForEach(presets) { preset in
+                ForEach(customs) { custom in
                     Button(action: {
-                        loadPreset(preset)
-                        showPresetDropdown = false
+                        loadCustom(custom)
+                        showCustomsDropdown = false
                     }) {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text(preset.name)
+                            Text(custom.name)
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundColor(.black)
                             
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("Button 1: \(codeToOption(preset.config["button1"] ?? 0, validOptions: circleButton1Options))")
+                                Text("Button 1: \(codeToOption(custom.config["button1"] ?? 0, validOptions: circleButton1Options))")
                                     .font(.system(size: 12))
                                     .foregroundColor(.black)
-                                Text("Button 2: \(codeToOption(preset.config["button2"] ?? 0, validOptions: circleButton2Options))")
+                                Text("Button 2: \(codeToOption(custom.config["button2"] ?? 0, validOptions: circleButton2Options))")
                                     .font(.system(size: 12))
                                     .foregroundColor(.black)
-                                Text("Buttons 1 + 2: \(codeToOption(preset.config["combo"] ?? 0, validOptions: buttons12Options))")
+                                Text("Buttons 1 + 2: \(codeToOption(custom.config["combo"] ?? 0, validOptions: buttons12Options))")
                                     .font(.system(size: 12))
                                     .foregroundColor(.black)
-                                Text("Scroll: \(codeToOption(preset.config["scroll"] ?? 0, validOptions: scrollOptions))")
+                                Text("Scroll: \(codeToOption(custom.config["scroll"] ?? 0, validOptions: scrollOptions))")
                                     .font(.system(size: 12))
                                     .foregroundColor(.black)
                             }
@@ -648,49 +718,10 @@ struct ContentView: View {
                         .background(Color.white)
                     }
                     
-                    if preset.id != presets.last?.id {
+                    if custom.id != customs.last?.id {
                         Divider()
                     }
                 }
-            }
-            
-            Divider()
-            
-            // Show Tutorial button
-            Button(action: {
-                showPresetDropdown = false
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    showInteractiveTutorial = true
-                }
-            }) {
-                HStack {
-                    Image(systemName: "lightbulb.fill")
-                        .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
-                    Text("Show Tutorial")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
-                }
-                .padding()
-                .frame(maxWidth: .infinity)
-            }
-            
-            Divider()
-            
-            // Reset Tutorial button (for testing)
-            Button(action: {
-                showPresetDropdown = false
-                hasCompletedOnboarding = false
-                print("📱 🔄 Tutorial reset - will show on next launch")
-            }) {
-                HStack {
-                    Image(systemName: "arrow.counterclockwise")
-                        .foregroundColor(.orange)
-                    Text("Reset Tutorial")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.orange)
-                }
-                .padding()
-                .frame(maxWidth: .infinity)
             }
         }
         .background(Color.white)
@@ -699,8 +730,8 @@ struct ContentView: View {
         .frame(width: 280)
     }
     
-    // MARK: - Preset Functions
-    func loadPreset(from jsonString: String) -> [String: Int]? {
+    // MARK: - Custom Functions - RENAMED FROM PRESET
+    func loadCustom(from jsonString: String) -> [String: Int]? {
         guard !jsonString.isEmpty,
               let jsonData = jsonString.data(using: .utf8) else {
             return nil
@@ -710,35 +741,35 @@ struct ContentView: View {
             let config = try JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Int]
             return config
         } catch {
-            print("❌ Failed to load preset: \(error)")
+            print("❌ Failed to load custom: \(error)")
             return nil
         }
     }
     
-    func savePreset(slot: Int) {
+    func saveCustom(slot: Int) {
         do {
             let jsonData = try JSONSerialization.data(withJSONObject: config, options: [])
             let jsonString = String(data: jsonData, encoding: .utf8) ?? ""
             
             if slot == 1 {
-                preset1Data = jsonString
+                custom1Data = jsonString
             } else {
-                preset2Data = jsonString
+                custom2Data = jsonString
             }
             
-            print("💾 Preset \(slot) saved: \(config)")
+            print("💾 Custom \(slot) saved: \(config)")
         } catch {
-            print("❌ Failed to save preset: \(error)")
+            print("❌ Failed to save custom: \(error)")
         }
     }
     
-    func loadPreset(_ preset: Preset) {
-        self.config = preset.config
+    func loadCustom(_ custom: Custom) {
+        self.config = custom.config
         saveConfigurationIfConnected()
-        print("📥 Loaded preset \(preset.id): \(preset.config)")
+        print("📥 Loaded custom \(custom.id): \(custom.config)")
     }
     
-    // MARK: - Controller Outline (With smaller cylindrical grips)
+    // MARK: - Controller Outline (With smaller cylindrical grips) - EXTENDED LENGTH BY 30% AND HEIGHT BY 25%, THEN SHORTENED FROM BOTTOM BY 10
     var controllerOutline: some View {
         GeometryReader { geometry in
             ZStack {
@@ -748,14 +779,14 @@ struct ContentView: View {
                 
                 // Nintendo Switch Joy-Con style outline with smaller cylindrical grips
                 Path { path in
-                    // Main rectangular body - increased height by 20 from center
-                    let bodyWidth: CGFloat = 480 // Keep current length
-                    let bodyHeight: CGFloat = 197.5 // Increased by 20 from 177.5 (total +40 from original)
+                    // Main rectangular body - EXTENDED LENGTH BY 30% AND HEIGHT BY 25%, THEN SHORTENED FROM BOTTOM BY 10
+                    let bodyWidth: CGFloat = 480 * 1.3 // EXTENDED LENGTH BY 30% (from 480 to 624)
+                    let bodyHeight: CGFloat = (197.5 * 1.25) - 10 // EXTENDED HEIGHT BY 25% THEN SHORTENED FROM BOTTOM BY 10 (from 246.875 to 236.875)
                     let cornerRadius: CGFloat = 23.5 // Keep current corners
                     
                     let bodyRect = CGRect(
                         x: centerX - bodyWidth / 2,
-                        y: containerHeight / 2 - bodyHeight / 2 + 40, // Positioned lower to surround icons
+                        y: containerHeight / 2 - bodyHeight / 2 - 30, // MOVED UP BY ANOTHER 20 (from -10 to -30)
                         width: bodyWidth,
                         height: bodyHeight
                     )
@@ -769,7 +800,7 @@ struct ContentView: View {
                     // Left grip extension - 0.5x smaller
                     let leftGripRect = CGRect(
                         x: centerX - bodyWidth / 2 - 22.5, // 0.5x smaller offset (from 45 to 22.5)
-                        y: containerHeight / 2 - 22.5, // 0.5x smaller position adjustment (from 45 to 22.5)
+                        y: containerHeight / 2 - 72.5, // MOVED UP BY ANOTHER 20 (from -52.5 to -72.5)
                         width: 45, // 0.5x smaller width (from 90 to 45)
                         height: 90 // 0.5x smaller height (from 180 to 90)
                     )
@@ -781,7 +812,7 @@ struct ContentView: View {
                     // Right grip extension - 0.5x smaller
                     let rightGripRect = CGRect(
                         x: centerX + bodyWidth / 2 - 22.5, // 0.5x smaller offset (from 45 to 22.5)
-                        y: containerHeight / 2 - 22.5, // 0.5x smaller position adjustment (from 45 to 22.5)
+                        y: containerHeight / 2 - 72.5, // MOVED UP BY ANOTHER 20 (from -52.5 to -72.5)
                         width: 45, // 0.5x smaller width (from 90 to 45)
                         height: 90 // 0.5x smaller height (from 180 to 90)
                     )
@@ -801,47 +832,76 @@ struct ContentView: View {
                 let containerWidth = geometry.size.width
                 let centerX = containerWidth / 2
                 
-                // Orange lines positioned above the outline - moved up by 15
-                let buttonSpacing: CGFloat = 30
-                let button1CenterX = centerX - buttonSpacing
-                let button2CenterX = centerX + buttonSpacing
+                // Orange lines positioned above the outline - MOVED TO BOTTOM AND FLIPPED
+                let buttonSpacing: CGFloat = 10 // Using the actual spacing between buttons
+                let button1CenterX = centerX - 60 // Button 1 center position (adjusted for new spacing)
+                let button2CenterX = centerX + 60 // Button 2 center position (adjusted for new spacing)
                 
-                // Position lines to match the text position - moved up by 15
-                let buttonTopY: CGFloat = 130
-                let horizontalLineY: CGFloat = 90
-                let textBottomY: CGFloat = 70
+                // Position lines to match the text position - MOVED DOWN BY 25
+                let buttonBottomY: CGFloat = 240 // MOVED DOWN BY 25 (from 215 to 240)
+                let horizontalLineY: CGFloat = 270 // MOVED DOWN BY 25 (from 245 to 270)
+                let textTopY: CGFloat = 290 // MOVED DOWN BY 25 (from 265 to 290)
                 
-                // Horizontal line endpoints - EXTENDED by 40 on each side (additional 20 from previous)
-                let horizontalLineStartX = button1CenterX - 40 // EXTENDED left by 40 (was 20)
-                let horizontalLineEndX = button2CenterX + 40 // EXTENDED right by 40 (was 20)
+                // Horizontal line endpoints - SHRUNK BY 10 ON EACH SIDE OF CENTER
+                let horizontalLineStartX = button1CenterX - 110 // SHRUNK LEFT BY 10 (from 120 to 110)
+                let horizontalLineEndX = button2CenterX + 110 // SHRUNK RIGHT BY 10 (from 120 to 110)
                 
-                // Vertical line from left endpoint up
+                // Vertical line from left endpoint down
                 Path { path in
-                    path.move(to: CGPoint(x: horizontalLineStartX, y: buttonTopY))
+                    path.move(to: CGPoint(x: horizontalLineStartX, y: buttonBottomY))
                     path.addLine(to: CGPoint(x: horizontalLineStartX, y: horizontalLineY))
                 }
                 .stroke(Color.orange, style: StrokeStyle(lineWidth: 2))
                 
-                // Vertical line from right endpoint up
+                // Vertical line from right endpoint down
                 Path { path in
-                    path.move(to: CGPoint(x: horizontalLineEndX, y: buttonTopY))
+                    path.move(to: CGPoint(x: horizontalLineEndX, y: buttonBottomY))
                     path.addLine(to: CGPoint(x: horizontalLineEndX, y: horizontalLineY))
                 }
                 .stroke(Color.orange, style: StrokeStyle(lineWidth: 2))
                 
-                // Horizontal line connecting both vertical lines - EXTENDED by 40 on each side (additional 20)
+                // Horizontal line connecting both vertical lines - SHRUNK BY 10 ON EACH SIDE
                 Path { path in
                     path.move(to: CGPoint(x: horizontalLineStartX, y: horizontalLineY))
                     path.addLine(to: CGPoint(x: horizontalLineEndX, y: horizontalLineY))
                 }
                 .stroke(Color.orange, style: StrokeStyle(lineWidth: 2))
                 
-                // Vertical line from horizontal line up to Buttons 1+2 text
+                // Vertical line from horizontal line down to Buttons 1+2 text
                 Path { path in
                     path.move(to: CGPoint(x: centerX, y: horizontalLineY))
-                    path.addLine(to: CGPoint(x: centerX, y: textBottomY))
+                    path.addLine(to: CGPoint(x: centerX, y: textTopY))
                 }
                 .stroke(Color.orange, style: StrokeStyle(lineWidth: 2))
+                
+                // ADD ARROWS TO THE TIP OF VERTICAL ORANGE LINES POINTING UP AT BUTTONS 1 + 2
+                // Left arrow
+                Path { path in
+                    let arrowSize: CGFloat = 8
+                    let tipX = horizontalLineStartX
+                    let tipY = buttonBottomY
+                    
+                    path.move(to: CGPoint(x: tipX, y: tipY))
+                    path.addLine(to: CGPoint(x: tipX - arrowSize, y: tipY + arrowSize))
+                    path.move(to: CGPoint(x: tipX, y: tipY))
+                    path.addLine(to: CGPoint(x: tipX + arrowSize, y: tipY + arrowSize))
+                }
+                .stroke(Color.orange, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                
+                // Right arrow
+                Path { path in
+                    let arrowSize: CGFloat = 8
+                    let tipX = horizontalLineEndX
+                    let tipY = buttonBottomY
+                    
+                    path.move(to: CGPoint(x: tipX, y: tipY))
+                    path.addLine(to: CGPoint(x: tipX - arrowSize, y: tipY + arrowSize))
+                    path.move(to: CGPoint(x: tipX, y: tipY))
+                    path.addLine(to: CGPoint(x: tipX + arrowSize, y: tipY + arrowSize))
+                }
+                .stroke(Color.orange, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                
+                // REMOVED THE BOTTOM ORANGE ARROW FACING DOWN (center arrow)
             }
         }
         .allowsHitTesting(false)
@@ -863,31 +923,31 @@ struct ContentView: View {
         }
     }
     
-    // Convert option string to numeric code
+    // Convert option string to numeric code - UPDATED FOR NEW NAMES
     func optionToCode(_ option: String) -> Int {
         switch option {
         case "Undo": return 3
         case "Redo": return 4
         case "Erase": return 5
-        case "Brush Size (5%)": return 6
+        case "Brush Size ±5%": return 6
         case "Color Palette": return 7
         case "Brush Library": return 8
-        case "Brush Size (10%)": return 9
+        case "Brush Size ±10%": return 9
         default: return 0
         }
     }
     
-    // Convert numeric code to option string, with validation
+    // Convert numeric code to option string, with validation - UPDATED FOR NEW NAMES
     func codeToOption(_ code: Int, validOptions: [String]) -> String {
         let option: String
         switch code {
         case 3: option = "Undo"
         case 4: option = "Redo"
         case 5: option = "Erase"
-        case 6: option = "Brush Size (5%)"
+        case 6: option = "Brush Size ±5%"
         case 7: option = "Color Palette"
         case 8: option = "Brush Library"
-        case 9: option = "Brush Size (10%)"
+        case 9: option = "Brush Size ±10%"
         default: option = validOptions.first ?? "Undo"
         }
         
