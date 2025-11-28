@@ -54,6 +54,21 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
         
         print("🔍 Starting BLE scan")
         
+        // CRITICAL: Check for already connected peripherals first
+        // This finds devices already paired in iOS Settings (like the keyboard)
+        let connectedPeripherals = central.retrieveConnectedPeripherals(withServices: [serviceUUID])
+        print("📱 Found \(connectedPeripherals.count) already connected peripheral(s) with config service")
+        
+        for peripheral in connectedPeripherals {
+            let deviceName = peripheral.name ?? "Unknown"
+            print("   ✅ Already connected: \(deviceName)")
+            if deviceName.hasPrefix("XIAO") && !devices.contains(where: { $0.identifier == peripheral.identifier }) {
+                devices.append(peripheral)
+                print("   ➕ Added to device list")
+            }
+        }
+        
+        // Also scan for new devices
         central.scanForPeripherals(withServices: nil, options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
         
         scanTimer?.invalidate()
@@ -161,14 +176,17 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
 
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi RSSI: NSNumber) {
         let deviceName = peripheral.name ?? "Unknown"
+        let isConnectable = advertisementData[CBAdvertisementDataIsConnectable] as? Bool ?? false
         
         // Debug: Log ALL discovered devices
-        print("🔍 Discovered: \(deviceName) - RSSI: \(RSSI.intValue)")
+        print("🔍 Discovered: \(deviceName) - RSSI: \(RSSI.intValue) - Connectable: \(isConnectable)")
         if let localName = advertisementData[CBAdvertisementDataLocalNameKey] as? String {
             print("   Local Name: \(localName)")
         }
         if let serviceUUIDs = advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID] {
             print("   Services: \(serviceUUIDs.map { $0.uuidString })")
+        } else {
+            print("   Services: None advertised (may be paired as keyboard)")
         }
         
         // Filter out devices with very weak signal
@@ -183,9 +201,10 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
             return
         }
         
-        // Only add if not already in list
+        // Accept device even if not advertising config service
+        // (it might be paired as keyboard but still has config service available)
         if !devices.contains(where: { $0.identifier == peripheral.identifier }) {
-            print("   ✅ ACCEPTED: Adding to device list")
+            print("   ✅ ACCEPTED: Adding to device list (may be paired as keyboard)")
             devices.append(peripheral)
             statusMessage = "Found \(devices.count) device(s)..."
         } else {
