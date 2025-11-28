@@ -1,4 +1,4 @@
-// Procreate Combined Controller - Brush Size + Undo + Erase
+// Procreate Combined Controller - Brush Size + Undo + Erase + Layer Navigation
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEServer.h>
@@ -94,11 +94,228 @@ bool lastEraseState = HIGH;
 bool eraserMode = false; // Track whether eraser is active
 bool undoPressProcessed = false; // Track if a button press has been processed
 
+// Mode switching variables
+bool modeSwitchProcessed = false; // Track if mode switch has been processed
+unsigned long modeSwitchStartTime = 0; // Time when both buttons were pressed
+#define MODE_SWITCH_DELAY 1000 // Hold both buttons for 1 second to switch modes
+
 // Timing variables
 unsigned long lastKeyPressTime = 0;
 unsigned long resetPressStartTime = 0;
 unsigned long lastUndoDebounceTime = 0;
 unsigned long lastEraseDebounceTime = 0;
+
+// Include layer handler after all necessary declarations
+#include "layer_handler.h"  // Layer navigation functionality
+
+// Layer handler function implementations
+// Initialize layer handler
+void initializeLayerHandler() {
+  currentMode = BRUSH_MODE;
+  lastLayerEncoderPos = encoderPos;
+  lastLayerCommandTime = 0;
+  layerModeProcessed = false;
+  layerPanelOpened = false;
+  currentLayerKeyMode = ARROW_KEYS;
+  layerKeyAttempts = 0;
+  
+  Serial.println("Layer handler initialized - Starting in BRUSH_MODE");
+}
+
+// Send layer navigation command
+void sendLayerCommand(uint8_t keyCode) {
+  if (!connected) {
+    Serial.println("ERROR: Cannot send layer command - not connected");
+    return;
+  }
+  
+  // Check timing to prevent too rapid commands
+  unsigned long currentTime = millis();
+  if (currentTime - lastLayerCommandTime < LAYER_NAVIGATION_DELAY) {
+    return; // Too soon, skip this command
+  }
+  
+  Serial.print("Sending layer command - Key: 0x");
+  Serial.println(keyCode, HEX);
+  
+  // Send key press
+  uint8_t msg[] = {0, 0, keyCode, 0, 0, 0, 0, 0};
+  inputKeyboard->setValue(msg, sizeof(msg));
+  inputKeyboard->notify();
+  delay(50);
+  
+  // Send key release
+  uint8_t msg2[] = {0, 0, 0, 0, 0, 0, 0, 0};
+  inputKeyboard->setValue(msg2, sizeof(msg2));
+  inputKeyboard->notify();
+  
+  lastLayerCommandTime = currentTime;
+  Serial.println("Layer command sent successfully");
+}
+
+// Process encoder movement for layer navigation
+void processLayerNavigation() {
+  if (currentMode != LAYER_MODE) {
+    return; // Not in layer mode, skip processing
+  }
+  
+  int currentEncoderPos = encoderPos;
+  int movement = currentEncoderPos - lastLayerEncoderPos;
+  
+  if (movement != 0) {
+    Serial.print("Layer selection - Movement: ");
+    Serial.print(movement);
+    
+    // Select appropriate keys based on current test mode
+    uint8_t upKey, downKey;
+    const char* keyName;
+    
+    switch (currentLayerKeyMode) {
+      case ARROW_KEYS:
+        upKey = KEY_UP_ARROW;
+        downKey = KEY_DOWN_ARROW;
+        keyName = "Arrow Keys";
+        break;
+      case BRACKET_KEYS:
+        upKey = KEY_LEFT_BRACKET;   // [ for previous layer
+        downKey = KEY_RIGHT_BRACKET; // ] for next layer
+        keyName = "Bracket Keys";
+        break;
+      case COMMA_PERIOD:
+        upKey = KEY_COMMA;          // , for previous layer
+        downKey = KEY_PERIOD;       // . for next layer
+        keyName = "Comma/Period";
+        break;
+      case SEMICOLON_QUOTE:
+        upKey = KEY_SEMICOLON;      // ; for previous layer
+        downKey = KEY_APOSTROPHE;   // ' for next layer
+        keyName = "Semicolon/Quote";
+        break;
+      default:
+        upKey = KEY_UP_ARROW;
+        downKey = KEY_DOWN_ARROW;
+        keyName = "Default Arrows";
+        break;
+    }
+    
+    Serial.print(" (testing ");
+    Serial.print(keyName);
+    Serial.println(")");
+    
+    // Process movement step by step for smooth navigation
+    if (movement > 0) {
+      // Clockwise = move to next layer (down in list)
+      for (int i = 0; i < movement; i++) {
+        sendLayerCommand(downKey);
+        Serial.println("→ Next layer");
+        layerKeyAttempts++;
+        delay(100); // Small delay between layer changes
+      }
+    } else {
+      // Counter-clockwise = move to previous layer (up in list) 
+      for (int i = 0; i < abs(movement); i++) {
+        sendLayerCommand(upKey);
+        Serial.println("← Previous layer");
+        layerKeyAttempts++;
+        delay(100); // Small delay between layer changes
+      }
+    }
+    
+    // Auto-switch to next key mode after 5 attempts if current one doesn't work
+    if (layerKeyAttempts >= 5) {
+      layerKeyAttempts = 0;
+      currentLayerKeyMode = (LayerKeyMode)((currentLayerKeyMode + 1) % 4);
+      Serial.println("=================================");
+      Serial.print("Auto-switching to: ");
+      switch (currentLayerKeyMode) {
+        case ARROW_KEYS: Serial.println("ARROW KEYS"); break;
+        case BRACKET_KEYS: Serial.println("BRACKET KEYS [ ]"); break;
+        case COMMA_PERIOD: Serial.println("COMMA/PERIOD KEYS , ."); break;
+        case SEMICOLON_QUOTE: Serial.println("SEMICOLON/QUOTE KEYS ; '"); break;
+      }
+      Serial.println("=================================");
+    }
+    
+    lastLayerEncoderPos = currentEncoderPos;
+    
+    // Visual feedback for layer navigation
+    digitalWrite(LED_PIN, HIGH);
+    delay(50);
+    digitalWrite(LED_PIN, LOW);
+  }
+}
+
+// Switch between brush mode and layer mode
+void switchControlMode() {
+  if (currentMode == BRUSH_MODE) {
+    currentMode = LAYER_MODE;
+    Serial.println("****** SWITCHED TO LAYER MODE ******");
+    Serial.println("Opening Procreate layer panel...");
+    
+    // Send L key to open layer panel in Procreate
+    if (connected) {
+      sendLayerCommand(KEY_L);
+      layerPanelOpened = true;
+      delay(200); // Give Procreate time to open the panel
+      Serial.println("Layer panel opened with L key");
+    }
+    
+    Serial.println("Rotary encoder now controls layer selection:");
+    Serial.println("- Clockwise: Select next layer (down)");
+    Serial.println("- Counter-clockwise: Select previous layer (up)");
+    Serial.println("Panel should remain open during navigation");
+    
+    indicateLayerMode();
+  } else {
+    currentMode = BRUSH_MODE;
+    Serial.println("****** SWITCHED TO BRUSH MODE ******");
+    
+    // Close layer panel by sending L key again
+    if (connected && layerPanelOpened) {
+      sendLayerCommand(KEY_L);
+      layerPanelOpened = false;
+      delay(200);
+      Serial.println("Layer panel closed");
+    }
+    
+    Serial.println("Rotary encoder now controls brush size");
+    resetLayerState();
+    
+    // Single long blink for brush mode
+    digitalWrite(LED_PIN, HIGH);
+    delay(300);
+    digitalWrite(LED_PIN, LOW);
+  }
+  
+  Serial.print("Current mode: ");
+  Serial.println(currentMode == BRUSH_MODE ? "BRUSH" : "LAYER");
+}
+
+// Visual indication for layer mode
+void indicateLayerMode() {
+  // Triple blink pattern for layer mode
+  for (int i = 0; i < LAYER_MODE_BLINK_PATTERN; i++) {
+    digitalWrite(LED_PIN, HIGH);
+    delay(150);
+    digitalWrite(LED_PIN, LOW);
+    delay(150);
+  }
+}
+
+// Reset layer state when switching back to brush mode
+void resetLayerState() {
+  lastLayerEncoderPos = encoderPos;
+  lastLayerCommandTime = 0;
+  layerModeProcessed = false;
+  layerPanelOpened = false;
+  currentLayerKeyMode = ARROW_KEYS;
+  layerKeyAttempts = 0;
+}
+
+// Get current mode as string for debugging
+const char* getCurrentModeString() {
+  return (currentMode == BRUSH_MODE) ? "BRUSH" : "LAYER";
+}
 
 // Function prototypes
 void updateBrushZone(int direction);
@@ -300,6 +517,11 @@ void toggleEraser() {
 
 // Process UNDO button
 void processUndo() {
+  // Skip undo processing if mode switching is in progress
+  if (modeSwitchStartTime != 0) {
+    return;
+  }
+  
   // Read the current state of the UNDO button
   bool currentUndoState = digitalRead(UNDO_PIN);
   
@@ -358,6 +580,11 @@ void processUndo() {
 
 // Process ERASE button - completely rewritten for simplicity and reliability
 void processErase() {
+  // Skip erase processing if mode switching is in progress
+  if (modeSwitchStartTime != 0) {
+    return;
+  }
+  
   static bool buttonActive = false;
   static unsigned long buttonPressTime = 0;
   
@@ -452,6 +679,70 @@ void updateBrushZone(int direction) {
   Serial.println(brushSizeZone);
 }
 
+// Process mode switching (hold UNDO + ERASE buttons simultaneously)
+void processModeSwitch() {
+  bool undoPressed = (digitalRead(UNDO_PIN) == LOW);
+  bool erasePressed = (digitalRead(ERASE_PIN) == LOW);
+  
+  // Both buttons pressed
+  if (undoPressed && erasePressed) {
+    if (modeSwitchStartTime == 0) {
+      // Buttons just pressed together
+      modeSwitchStartTime = millis();
+      modeSwitchProcessed = false;
+      Serial.println("Both buttons pressed - hold to switch modes...");
+      
+      // Start visual feedback - quick blink to show detection
+      digitalWrite(LED_PIN, HIGH);
+      delay(50);
+      digitalWrite(LED_PIN, LOW);
+    } else if (!modeSwitchProcessed && (millis() - modeSwitchStartTime >= MODE_SWITCH_DELAY)) {
+      // Long press detected, switch modes
+      Serial.println("Mode switch delay reached - switching modes!");
+      
+      // Visual feedback before switching
+      for (int i = 0; i < 2; i++) {
+        digitalWrite(LED_PIN, HIGH);
+        delay(100);
+        digitalWrite(LED_PIN, LOW);
+        delay(100);
+      }
+      
+      switchControlMode();
+      modeSwitchProcessed = true;
+      Serial.println("Mode switch activated!");
+    } else {
+      // Show progress during hold - blink every 250ms
+      static unsigned long lastProgressBlink = 0;
+      if (millis() - lastProgressBlink > 250) {
+        digitalWrite(LED_PIN, HIGH);
+        delay(25);
+        digitalWrite(LED_PIN, LOW);
+        lastProgressBlink = millis();
+      }
+    }
+  } else {
+    // Reset mode switch state when buttons are released
+    if (modeSwitchStartTime != 0) {
+      unsigned long holdTime = millis() - modeSwitchStartTime;
+      if (!modeSwitchProcessed && holdTime < MODE_SWITCH_DELAY) {
+        Serial.print("Buttons released too early (held for ");
+        Serial.print(holdTime);
+        Serial.print("ms, needed ");
+        Serial.print(MODE_SWITCH_DELAY);
+        Serial.println("ms)");
+        
+        // Visual feedback for failed attempt
+        digitalWrite(LED_PIN, HIGH);
+        delay(200);
+        digitalWrite(LED_PIN, LOW);
+      }
+      modeSwitchStartTime = 0;
+      modeSwitchProcessed = false;
+    }
+  }
+}
+
 void setup() {
   Serial.begin(115200);
   delay(1000); // Longer delay to ensure serial is ready
@@ -482,6 +773,11 @@ void setup() {
   Serial.println("- 4: Coarse (2 clicks per step)");
   Serial.println("- 5: Very Coarse (1 click per step)");
   Serial.println("Sensitivity automatically adjusts based on how quickly you're turning the knob");
+  Serial.println("\n** NEW LAYER NAVIGATION **");
+  Serial.println("Hold UNDO + ERASE buttons for 1 second to switch modes:");
+  Serial.println("- BRUSH MODE: Encoder controls brush size (default)");
+  Serial.println("- LAYER MODE: Encoder navigates through layers");
+  Serial.println("***************************");
   
   // Configure pins
   pinMode(UNDO_PIN, INPUT_PULLUP);
@@ -532,6 +828,9 @@ void setup() {
   
   Serial.println("Waiting for connection...");
   
+  // Initialize layer handler
+  initializeLayerHandler();
+  
   // Disable WiFi to reduce ADC noise (ESP32 specific)
   WiFi.mode(WIFI_OFF);
 }
@@ -541,10 +840,18 @@ unsigned long lastDebugTime = 0;
 const unsigned long DEBUG_INTERVAL = 5000; // Print debug info every 5 seconds
 
 void loop() {
-  // Process encoder input for brush size
-  processBrushSize();
+  // Process mode switching first (hold both buttons)
+  processModeSwitch();
   
-  // Process button inputs
+  // Process encoder input based on current mode
+  if (currentMode == BRUSH_MODE) {
+    processBrushSize();
+  } else {
+    processLayerNavigation();
+  }
+  
+  // Process button inputs (only if not switching modes)
+  // Note: The individual button functions now check modeSwitchStartTime internally
   processUndo();
   processErase();
   processReset();
@@ -558,6 +865,8 @@ void loop() {
     Serial.print(currentMillis / 1000);
     Serial.print("s, Connected: ");
     Serial.print(connected ? "YES" : "NO");
+    Serial.print(", Mode: ");
+    Serial.print(getCurrentModeString());
     Serial.print(", Eraser: ");
     Serial.print(eraserMode ? "ON" : "OFF");
     Serial.print(", Encoder: ");

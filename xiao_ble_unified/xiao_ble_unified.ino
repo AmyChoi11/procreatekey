@@ -1,28 +1,3 @@
-/*
- * XIAO ESP32-S3 BLE Keyboard - UNIFIED FIRMWARE
- * 
- * AUTO MODE SWITCHING:
- * - First boot: CONFIG MODE (30 seconds) → Configure via iOS app
- * - After config: KEYBOARD MODE (remembers on reboot)
- * - Hold RESET 5 seconds: Return to CONFIG MODE
- * 
- * HARDWARE:
- * - Button 1 (Pin 3): One side to GPIO3, other to GND
- * - Button 2 (Pin 4): One side to GPIO4, other to GND
- * - Button 1+2: Configurable (Color Palette/Brush Library)
- * - Dial (Pin 5/6): Encoder A to GPIO5, Encoder B to GPIO6
- * - Reset Button (Pin 1): One side to GPIO1, other to 3V3 (NOT 5V!)
- * 
- * FUNCTION CODES:
- * 3 = Undo (Cmd+Z)
- * 4 = Redo (Cmd+Shift+Z)
- * 5 = Erase (E key)
- * 6 = Brush Size 5% ([ / ] keys)
- * 7 = Color Palette (Cmd+C)
- * 8 = Brush Library (B key)
- * 9 = Brush Size 10% (Up+] / Down+[)
- */
-
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEServer.h>
@@ -34,11 +9,11 @@
 #include <HIDTypes.h>
 
 // ============= Pin Definitions =============
-#define BUTTON1_PIN 3
-#define BUTTON2_PIN 4
-#define ENCODER_A   5
+#define BUTTON1_PIN 4
+#define BUTTON2_PIN 5
+#define ENCODER_A   7
 #define ENCODER_B   6
-#define RESET_BTN   1  // Changed from GPIO15 (boot pin) to GPIO16
+#define RESET_BTN   16  // Changed from GPIO15 (boot pin) to GPIO16
 #define LED_PIN     2
 
 // ============= Key Codes =============
