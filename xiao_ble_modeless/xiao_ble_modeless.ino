@@ -1,5 +1,5 @@
 /*
- * XIAO ESP32-S3 BLE Keyboard - MODELESS (No Config Mode)
+ * XIAO ESP32-S3 BLE Keyboard with Custom Preset Switch
  * 
  * DESIGN PHILOSOPHY: Config service is ALWAYS accessible
  * 
@@ -7,13 +7,23 @@
  * 1. First boot: Pair as keyboard on iPad
  * 2. Anytime: Open iOS app → reconfigure (no button press needed!)
  * 3. Config changes apply instantly (no restart)
+ * 4. Use 3-position switch to swap between 3 custom presets
  * 
  * HARDWARE:
  * - Button 1 (Pin 4): Configurable function
  * - Button 2 (Pin 5): Configurable function
  * - Button 1+2: Combo function
  * - Dial (Pin 7/6): Brush size control
- * - Reset Button (Pin 16): Not used (reserved for future features)
+ * - 3-Position Switch:
+ *   • Left Pin (Pin 14): Custom 1
+ *   • Middle Pin (VCC): Common power
+ *   • Right Pin (Pin 15): Custom 3
+ *   • Middle position: Custom 2
+ * 
+ * CUSTOM PRESETS:
+ * - Custom 1: User-defined configuration (switch left)
+ * - Custom 2: User-defined configuration (switch middle)
+ * - Custom 3: User-defined configuration (switch right)
  * 
  * FUNCTION CODES:
  * 3 = Undo (Cmd+Z)
@@ -40,7 +50,8 @@
 #define BUTTON2_PIN 5
 #define ENCODER_A   7
 #define ENCODER_B   6
-#define RESET_BTN   16  // Reserved for future use
+#define SWITCH_LEFT  16  // 3-position switch left (Custom 1)
+#define SWITCH_RIGHT 15  // 3-position switch right (Custom 3)
 #define LED_PIN     2
 
 // ============= Key Codes =============
@@ -62,6 +73,12 @@ struct ButtonConfig {
   int combo = 7;    // Default: Color Palette
   int dial = 9;     // Default: Brush Size 10%
 } config;
+
+// ============= Custom Preset System =============
+#define MAX_CUSTOMS 3
+ButtonConfig customs[MAX_CUSTOMS];
+int currentCustom = 0;  // 0 = Custom 1, 1 = Custom 2, 2 = Custom 3
+int lastSwitchMode = -1;  // Track last switch position
 
 Preferences prefs;
 
@@ -134,15 +151,20 @@ class ConfigCallbacks : public BLECharacteristicCallbacks {
         config.combo = constrain(config.combo, 0, 11);
         config.dial = constrain(config.dial, 0, 11);
         
-        // Save to flash
-        prefs.begin("config", false);
-        prefs.putInt("button1", config.button1);
-        prefs.putInt("button2", config.button2);
-        prefs.putInt("combo", config.combo);
-        prefs.putInt("dial", config.dial);
+        // Save to current custom preset
+        prefs.begin("customs", false);
+        String prefix = "c" + String(currentCustom) + "_";
+        prefs.putInt((prefix + "b1").c_str(), config.button1);
+        prefs.putInt((prefix + "b2").c_str(), config.button2);
+        prefs.putInt((prefix + "combo").c_str(), config.combo);
+        prefs.putInt((prefix + "dial").c_str(), config.dial);
         prefs.end();
         
-        Serial.println("\n✅ CONFIG SAVED & APPLIED INSTANTLY!");
+        // Update in-memory custom
+        customs[currentCustom] = config;
+        
+        Serial.println("\n✅ CONFIG SAVED & APPLIED!");
+        Serial.printf("  Saved to: %s\n", getCustomName(currentCustom));
         Serial.printf("  Button 1: %d\n", config.button1);
         Serial.printf("  Button 2: %d\n", config.button2);
         Serial.printf("  Combo (1+2): %d\n", config.combo);
@@ -265,6 +287,61 @@ void sendBrushKey10(bool increase) {
   input->notify();
 }
 
+// ============= Switch Mode Detection =============
+int getSwitchMode() {
+  int leftState = digitalRead(SWITCH_LEFT);
+  int rightState = digitalRead(SWITCH_RIGHT);
+  
+  // Custom 1: Left=HIGH, Right=LOW (switch to left)
+  if (leftState == HIGH && rightState == LOW) return 0;
+  
+  // Custom 2: Left=LOW, Right=LOW (switch in middle)
+  if (leftState == LOW && rightState == LOW) return 1;
+  
+  // Custom 3: Left=LOW, Right=HIGH (switch to right)
+  if (leftState == LOW && rightState == HIGH) return 2;
+  
+  // Default to Custom 2 if invalid state
+  return 1;
+}
+
+const char* getCustomName(int customNum) {
+  switch(customNum) {
+    case 0: return "Custom 1";
+    case 1: return "Custom 2";
+    case 2: return "Custom 3";
+    default: return "Unknown";
+  }
+}
+
+void loadCustom(int customNum) {
+  if (customNum < 0 || customNum >= MAX_CUSTOMS) return;
+  
+  // Load custom preset from flash
+  prefs.begin("customs", true);
+  String prefix = "c" + String(customNum) + "_";
+  
+  int b1 = prefs.getInt((prefix + "b1").c_str(), -1);
+  
+  // Only load if custom exists (button1 != -1)
+  if (b1 != -1) {
+    config.button1 = b1;
+    config.button2 = prefs.getInt((prefix + "b2").c_str(), 3);
+    config.combo = prefs.getInt((prefix + "combo").c_str(), 7);
+    config.dial = prefs.getInt((prefix + "dial").c_str(), 9);
+    
+    Serial.printf("✅ Loaded %s\n", getCustomName(customNum));
+    Serial.printf("   Button 1: %d, Button 2: %d, Combo: %d, Dial: %d\n",
+                  config.button1, config.button2, config.combo, config.dial);
+  } else {
+    // Custom not saved yet - use default config
+    Serial.printf("⚠️ %s not configured - using defaults\n", getCustomName(customNum));
+  }
+  
+  prefs.end();
+  currentCustom = customNum;
+}
+
 // ============= Encoder Interrupt =============
 void IRAM_ATTR handleEncoder() {
   unsigned long currentTime = millis();
@@ -301,25 +378,38 @@ void setup() {
   pinMode(BUTTON2_PIN, INPUT_PULLUP);
   pinMode(ENCODER_A, INPUT_PULLUP);
   pinMode(ENCODER_B, INPUT_PULLUP);
-  pinMode(RESET_BTN, INPUT_PULLDOWN);  // Reserved for future
+  pinMode(SWITCH_LEFT, INPUT_PULLDOWN);   // 3-position switch left
+  pinMode(SWITCH_RIGHT, INPUT_PULLDOWN);  // 3-position switch right
   pinMode(LED_PIN, OUTPUT);
   
   attachInterrupt(digitalPinToInterrupt(ENCODER_A), handleEncoder, CHANGE);
   attachInterrupt(digitalPinToInterrupt(ENCODER_B), handleEncoder, CHANGE);
   
-  // Load config from flash
-  prefs.begin("config", true);
-  config.button1 = prefs.getInt("button1", 3);
-  config.button2 = prefs.getInt("button2", 3);
-  config.combo = prefs.getInt("combo", 7);
-  config.dial = prefs.getInt("dial", 9);
+  // Load all customs from flash
+  prefs.begin("customs", true);
+  for (int i = 0; i < MAX_CUSTOMS; i++) {
+    String prefix = "c" + String(i) + "_";
+    customs[i].button1 = prefs.getInt((prefix + "b1").c_str(), -1);
+    customs[i].button2 = prefs.getInt((prefix + "b2").c_str(), 3);
+    customs[i].combo = prefs.getInt((prefix + "combo").c_str(), 7);
+    customs[i].dial = prefs.getInt((prefix + "dial").c_str(), 9);
+    
+    if (customs[i].button1 != -1) {
+      Serial.printf("%s: B1=%d B2=%d Combo=%d Dial=%d\n",
+        getCustomName(i), customs[i].button1, customs[i].button2, 
+        customs[i].combo, customs[i].dial);
+    } else {
+      Serial.printf("%s: Not configured\n", getCustomName(i));
+    }
+  }
   prefs.end();
+  Serial.println();
   
-  Serial.printf("Loaded config:\n");
-  Serial.printf("  Button 1: %d\n", config.button1);
-  Serial.printf("  Button 2: %d\n", config.button2);
-  Serial.printf("  Combo (1+2): %d\n", config.combo);
-  Serial.printf("  Dial: %d\n\n", config.dial);
+  // Load initial custom based on switch position
+  int initialMode = getSwitchMode();
+  loadCustom(initialMode);
+  lastSwitchMode = initialMode;
+  Serial.printf("Initial custom: %s\n\n", getCustomName(initialMode));
   
   // ===== INITIALIZE BLE WITH BOTH SERVICES =====
   Serial.println("🔵 Initializing BLE...");
@@ -408,6 +498,32 @@ void loop() {
     digitalWrite(LED_PIN, HIGH);
   } else {
     digitalWrite(LED_PIN, LOW);
+  }
+  
+  // ========== CUSTOM PRESET SWITCHING ==========
+  // Check 3-position switch for custom changes
+  int currentMode = getSwitchMode();
+  if (currentMode != lastSwitchMode) {
+    // Debounce
+    delay(50);
+    currentMode = getSwitchMode();
+    
+    if (currentMode != lastSwitchMode) {
+      Serial.println("\n========================================");
+      Serial.printf("🔄 CUSTOM SWITCH DETECTED\n");
+      Serial.printf("   Previous: %s\n", getCustomName(lastSwitchMode));
+      Serial.printf("   New: %s\n", getCustomName(currentMode));
+      
+      loadCustom(currentMode);
+      lastSwitchMode = currentMode;
+      
+      // Visual feedback - quick blink
+      digitalWrite(LED_PIN, LOW);
+      delay(100);
+      digitalWrite(LED_PIN, deviceConnected ? HIGH : LOW);
+      
+      Serial.println("========================================\n");
+    }
   }
   
   // ========== KEYBOARD FUNCTIONS ==========
