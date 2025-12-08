@@ -12,6 +12,7 @@
  * HARDWARE:
  * - Button 1 (Pin 4): Configurable function
  * - Button 2 (Pin 5): Configurable function
+ * - Button 3 (Pin 9): Configurable function
  * - Button 1+2: Combo function
  * - Dial (Pin 7/6): Brush size control
  * - 3-Position Switch:
@@ -48,6 +49,7 @@
 // ============= Pin Definitions =============
 #define BUTTON1_PIN 4
 #define BUTTON2_PIN 5
+#define BUTTON3_PIN 9
 #define ENCODER_A   7
 #define ENCODER_B   6
 #define SWITCH_LEFT  16  // 3-position switch left (Custom 1)
@@ -70,6 +72,7 @@ const unsigned long ENCODER_DEBOUNCE = 5;
 struct ButtonConfig {
   int button1 = 3;  // Default: Undo
   int button2 = 3;  // Default: Undo
+  int button3 = 3;  // Default: Undo
   int combo = 7;    // Default: Color Palette
   int dial = 9;     // Default: Brush Size 10%
 } config;
@@ -142,12 +145,14 @@ class ConfigCallbacks : public BLECharacteristicCallbacks {
         // Update in-memory config
         config.button1 = buttons["button1"].as<int>();
         config.button2 = buttons["button2"].as<int>();
+        config.button3 = buttons["button3"].as<int>();
         config.combo = buttons["combo"].as<int>();
         config.dial = buttons["dial"].as<int>();
         
         // Constrain values
         config.button1 = constrain(config.button1, 0, 11);
         config.button2 = constrain(config.button2, 0, 11);
+        config.button3 = constrain(config.button3, 0, 11);
         config.combo = constrain(config.combo, 0, 11);
         config.dial = constrain(config.dial, 0, 11);
         
@@ -156,6 +161,7 @@ class ConfigCallbacks : public BLECharacteristicCallbacks {
         String prefix = "c" + String(currentCustom) + "_";
         prefs.putInt((prefix + "b1").c_str(), config.button1);
         prefs.putInt((prefix + "b2").c_str(), config.button2);
+        prefs.putInt((prefix + "b3").c_str(), config.button3);
         prefs.putInt((prefix + "combo").c_str(), config.combo);
         prefs.putInt((prefix + "dial").c_str(), config.dial);
         prefs.end();
@@ -167,6 +173,7 @@ class ConfigCallbacks : public BLECharacteristicCallbacks {
         Serial.printf("  Saved to: %s\n", getCustomName(currentCustom));
         Serial.printf("  Button 1: %d\n", config.button1);
         Serial.printf("  Button 2: %d\n", config.button2);
+        Serial.printf("  Button 3: %d\n", config.button3);
         Serial.printf("  Combo (1+2): %d\n", config.combo);
         Serial.printf("  Dial: %d\n", config.dial);
         Serial.println("========================================\n");
@@ -189,6 +196,7 @@ class ConfigCallbacks : public BLECharacteristicCallbacks {
     JsonObject buttons = doc.createNestedObject("buttons");
     buttons["button1"] = config.button1;
     buttons["button2"] = config.button2;
+    buttons["button3"] = config.button3;
     buttons["combo"] = config.combo;
     buttons["dial"] = config.dial;
     
@@ -327,12 +335,13 @@ void loadCustom(int customNum) {
   if (b1 != -1) {
     config.button1 = b1;
     config.button2 = prefs.getInt((prefix + "b2").c_str(), 3);
+    config.button3 = prefs.getInt((prefix + "b3").c_str(), 3);
     config.combo = prefs.getInt((prefix + "combo").c_str(), 7);
     config.dial = prefs.getInt((prefix + "dial").c_str(), 9);
     
     Serial.printf("✅ Loaded %s\n", getCustomName(customNum));
-    Serial.printf("   Button 1: %d, Button 2: %d, Combo: %d, Dial: %d\n",
-                  config.button1, config.button2, config.combo, config.dial);
+    Serial.printf("   Button 1: %d, Button 2: %d, Button 3: %d, Combo: %d, Dial: %d\n",
+                  config.button1, config.button2, config.button3, config.combo, config.dial);
   } else {
     // Custom not saved yet - use default config
     Serial.printf("⚠️ %s not configured - using defaults\n", getCustomName(customNum));
@@ -376,6 +385,7 @@ void setup() {
   
   pinMode(BUTTON1_PIN, INPUT_PULLUP);
   pinMode(BUTTON2_PIN, INPUT_PULLUP);
+  pinMode(BUTTON3_PIN, INPUT_PULLUP);
   pinMode(ENCODER_A, INPUT_PULLUP);
   pinMode(ENCODER_B, INPUT_PULLUP);
   pinMode(SWITCH_LEFT, INPUT_PULLDOWN);   // 3-position switch left
@@ -391,12 +401,13 @@ void setup() {
     String prefix = "c" + String(i) + "_";
     customs[i].button1 = prefs.getInt((prefix + "b1").c_str(), -1);
     customs[i].button2 = prefs.getInt((prefix + "b2").c_str(), 3);
+    customs[i].button3 = prefs.getInt((prefix + "b3").c_str(), 3);
     customs[i].combo = prefs.getInt((prefix + "combo").c_str(), 7);
     customs[i].dial = prefs.getInt((prefix + "dial").c_str(), 9);
     
     if (customs[i].button1 != -1) {
-      Serial.printf("%s: B1=%d B2=%d Combo=%d Dial=%d\n",
-        getCustomName(i), customs[i].button1, customs[i].button2, 
+      Serial.printf("%s: B1=%d B2=%d B3=%d Combo=%d Dial=%d\n",
+        getCustomName(i), customs[i].button1, customs[i].button2, customs[i].button3,
         customs[i].combo, customs[i].dial);
     } else {
       Serial.printf("%s: Not configured\n", getCustomName(i));
@@ -490,6 +501,7 @@ void setup() {
 static bool button1Pressed = false;
 static bool button2Pressed = false;
 static bool button3Pressed = false;
+static bool comboPressed = false;
 static long lastEncoderPos = 0;
 
 void loop() {
@@ -546,17 +558,18 @@ void loop() {
     // Buttons
     bool btn1Low = (digitalRead(BUTTON1_PIN) == LOW);
     bool btn2Low = (digitalRead(BUTTON2_PIN) == LOW);
+    bool btn3Low = (digitalRead(BUTTON3_PIN) == LOW);
     bool bothPressed = btn1Low && btn2Low;
     
     // Combo (button1+2)
-    if (bothPressed && !button3Pressed) {
+    if (bothPressed && !comboPressed) {
       Serial.println("🔘 COMBO PRESSED");
-      button3Pressed = true;
+      comboPressed = true;
       sendFunctionKey(config.combo);
       button1Pressed = true;
       button2Pressed = true;
-    } else if (!bothPressed && button3Pressed) {
-      button3Pressed = false;
+    } else if (!bothPressed && comboPressed) {
+      comboPressed = false;
     }
     
     // Button 1
@@ -585,6 +598,20 @@ void loop() {
       }
     } else if (!btn2Low) {
       button2Pressed = false;
+    }
+    
+    // Button 3
+    if (btn3Low && !button3Pressed) {
+      Serial.println("🔘 BUTTON 3");
+      button3Pressed = true;
+      
+      if (config.button3 == 6) {
+        sendBrushKey5(true);
+      } else {
+        sendFunctionKey(config.button3);
+      }
+    } else if (!btn3Low) {
+      button3Pressed = false;
     }
   }
   
