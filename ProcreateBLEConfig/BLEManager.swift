@@ -8,7 +8,7 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
     @Published var statusMessage: String = ""
     @Published var isScanning: Bool = false
     @Published var bluetoothState: CBManagerState = .unknown
-    @Published var currentConfig: [String: Int] = ["button1": 3, "button2": 3, "combo": 7, "dial": 9]
+    @Published var currentConfig: [String: Int] = ["button1": 3, "button2": 3, "button3": 3, "combo": 7, "scroll": 9]
     @Published var detectedProblem: DetectedProblem?
     
     private var central: CBCentralManager!

@@ -12,9 +12,9 @@
  * HARDWARE:
  * - Button 1 (Pin 4): Configurable function
  * - Button 2 (Pin 5): Configurable function
- * - Button 3 (Pin 9): Configurable function
+ * - Button 3 (Pin 9): Click on Scroll - Independent button (configurable)
  * - Button 1+2: Combo function
- * - Dial (Pin 7/6): Brush size control
+ * - Scroll Wheel (Pin 7/6): Brush size control (rotate to adjust)
  * - 3-Position Switch:
  *   • Left Pin (Pin 14): Custom 1
  *   • Middle Pin (VCC): Common power
@@ -74,7 +74,7 @@ struct ButtonConfig {
   int button2 = 3;  // Default: Undo
   int button3 = 3;  // Default: Undo
   int combo = 7;    // Default: Color Palette
-  int dial = 9;     // Default: Brush Size 10%
+  int scroll = 9;     // Default: Brush Size 10%
 } config;
 
 // ============= Custom Preset System =============
@@ -147,14 +147,14 @@ class ConfigCallbacks : public BLECharacteristicCallbacks {
         config.button2 = buttons["button2"].as<int>();
         config.button3 = buttons["button3"].as<int>();
         config.combo = buttons["combo"].as<int>();
-        config.dial = buttons["dial"].as<int>();
+        config.scroll = buttons["scroll"].as<int>();
         
         // Constrain values
         config.button1 = constrain(config.button1, 0, 11);
         config.button2 = constrain(config.button2, 0, 11);
         config.button3 = constrain(config.button3, 0, 11);
         config.combo = constrain(config.combo, 0, 11);
-        config.dial = constrain(config.dial, 0, 11);
+        config.scroll = constrain(config.scroll, 0, 11);
         
         // Save to current custom preset
         prefs.begin("customs", false);
@@ -163,7 +163,7 @@ class ConfigCallbacks : public BLECharacteristicCallbacks {
         prefs.putInt((prefix + "b2").c_str(), config.button2);
         prefs.putInt((prefix + "b3").c_str(), config.button3);
         prefs.putInt((prefix + "combo").c_str(), config.combo);
-        prefs.putInt((prefix + "dial").c_str(), config.dial);
+        prefs.putInt((prefix + "scroll").c_str(), config.scroll);
         prefs.end();
         
         // Update in-memory custom
@@ -175,7 +175,7 @@ class ConfigCallbacks : public BLECharacteristicCallbacks {
         Serial.printf("  Button 2: %d\n", config.button2);
         Serial.printf("  Button 3: %d\n", config.button3);
         Serial.printf("  Combo (1+2): %d\n", config.combo);
-        Serial.printf("  Dial: %d\n", config.dial);
+        Serial.printf("  Scroll: %d\n", config.scroll);
         Serial.println("========================================\n");
         
         // Visual confirmation - triple blink
@@ -198,7 +198,7 @@ class ConfigCallbacks : public BLECharacteristicCallbacks {
     buttons["button2"] = config.button2;
     buttons["button3"] = config.button3;
     buttons["combo"] = config.combo;
-    buttons["dial"] = config.dial;
+    buttons["scroll"] = config.scroll;
     
     String output;
     serializeJson(doc, output);
@@ -337,11 +337,11 @@ void loadCustom(int customNum) {
     config.button2 = prefs.getInt((prefix + "b2").c_str(), 3);
     config.button3 = prefs.getInt((prefix + "b3").c_str(), 3);
     config.combo = prefs.getInt((prefix + "combo").c_str(), 7);
-    config.dial = prefs.getInt((prefix + "dial").c_str(), 9);
+    config.scroll = prefs.getInt((prefix + "scroll").c_str(), 9);
     
     Serial.printf("✅ Loaded %s\n", getCustomName(customNum));
-    Serial.printf("   Button 1: %d, Button 2: %d, Button 3: %d, Combo: %d, Dial: %d\n",
-                  config.button1, config.button2, config.button3, config.combo, config.dial);
+    Serial.printf("   Button 1: %d, Button 2: %d, Button 3: %d, Combo: %d, Scroll: %d\n",
+                  config.button1, config.button2, config.button3, config.combo, config.scroll);
   } else {
     // Custom not saved yet - use default config
     Serial.printf("⚠️ %s not configured - using defaults\n", getCustomName(customNum));
@@ -403,12 +403,12 @@ void setup() {
     customs[i].button2 = prefs.getInt((prefix + "b2").c_str(), 3);
     customs[i].button3 = prefs.getInt((prefix + "b3").c_str(), 3);
     customs[i].combo = prefs.getInt((prefix + "combo").c_str(), 7);
-    customs[i].dial = prefs.getInt((prefix + "dial").c_str(), 9);
+    customs[i].scroll = prefs.getInt((prefix + "scroll").c_str(), 9);
     
     if (customs[i].button1 != -1) {
-      Serial.printf("%s: B1=%d B2=%d B3=%d Combo=%d Dial=%d\n",
+      Serial.printf("%s: B1=%d B2=%d B3=%d Combo=%d Scroll=%d\n",
         getCustomName(i), customs[i].button1, customs[i].button2, customs[i].button3,
-        customs[i].combo, customs[i].dial);
+        customs[i].combo, customs[i].scroll);
     } else {
       Serial.printf("%s: Not configured\n", getCustomName(i));
     }
@@ -546,9 +546,9 @@ void loop() {
     if (currentPos != lastEncoderPos) {
       bool increase = (currentPos > lastEncoderPos);
       
-      if (config.dial == 6) {
+      if (config.scroll == 6) {
         sendBrushKey5(increase);
-      } else if (config.dial == 9) {
+      } else if (config.scroll == 9) {
         sendBrushKey10(increase);
       }
       

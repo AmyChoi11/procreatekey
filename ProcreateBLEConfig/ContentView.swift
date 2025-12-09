@@ -63,7 +63,7 @@ struct ContentView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     
     // Store configuration as numeric codes - UPDATED DEFAULT SETTINGS
-    @State private var config: [String: Int] = ["button1": 3, "button2": 5, "combo": 8, "scroll": 6]  // Undo, Erase, Brush Library, Brush Size 5%
+    @State private var config: [String: Int] = ["button1": 3, "button2": 5, "button3": 3, "combo": 8, "scroll": 6]  // Undo, Erase, Undo (click scroll), Brush Library, Brush Size 5%
     @State private var showDeviceSheet = false
     @State private var hasShownInitialSheet = false
     @State private var showOnboarding = false
@@ -77,13 +77,14 @@ struct ContentView: View {
     @State private var comboFrame: CGRect = .zero
     @State private var scanButtonFrame: CGRect = .zero
     
-    // State for showing dropdowns
+    // State for showing dropdowns with anchor frames
     @State private var showScrollDropdown = false
     @State private var showButton1Dropdown = false
     @State private var showButton2Dropdown = false
     @State private var showComboDropdown = false
     @State private var showCustomsDropdown = false
     @State private var showHelpDropdown = false
+    @State private var showClickScrollDropdown = false
     
     // New state variables for custom functionality
     @State private var showSaveCustomDropdown = false
@@ -115,6 +116,22 @@ struct ContentView: View {
         let id: Int
         var name: String
         let config: [String: Int]
+    }
+    
+    // MARK: - Custom Functions - RENAMED FROM PRESET (MOVED BEFORE customs PROPERTY)
+    func loadCustom(from jsonString: String) -> [String: Int]? {
+        guard !jsonString.isEmpty,
+              let jsonData = jsonString.data(using: .utf8) else {
+            return nil
+        }
+        
+        do {
+            let config = try JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Int]
+            return config
+        } catch {
+            print("❌ Failed to load custom: \(error)")
+            return nil
+        }
     }
     
     var customs: [Custom] {
@@ -149,145 +166,184 @@ struct ContentView: View {
     }
     
     // DEFAULT CONFIGURATION
-    private let defaultConfig: [String: Int] = ["button1": 3, "button2": 5, "combo": 8, "scroll": 6]  // Undo, Erase, Brush Library, Brush Size 5%
+    private let defaultConfig: [String: Int] = ["button1": 3, "button2": 5, "button3": 3, "combo": 8, "scroll": 6]  // Undo, Erase, Undo (click), Brush Library, Brush Size 5%
+    
+    // SCALING CONSTANTS
+    private let controllerScale: CGFloat = 1.5
+    private let buttonScale: CGFloat = 1.5
     
     var body: some View {
-        ZStack {
-            mainNavigationView
-                .sheet(isPresented: $showDeviceSheet) {
-                    DeviceSelectionSheet(bleManager: bleManager, showDeviceSheet: $showDeviceSheet)
+        GeometryReader { geometry in
+            // Replace the entire main ZStack structure with:
+            ZStack {
+                mainNavigationView
+                    .sheet(isPresented: $showDeviceSheet) {
+                        DeviceSelectionSheet(bleManager: bleManager, showDeviceSheet: $showDeviceSheet)
+                    }
+                    .sheet(isPresented: $showOnboarding) {
+                        OnboardingView(showOnboarding: $showOnboarding)
+                    }
+                    .sheet(isPresented: $showHelp) {
+                        HelpView()
+                            .environmentObject(bleManager)
+                    }
+                    .onAppear {
+                        handleOnAppear()
+                    }
+                    .onChange(of: scenePhase) { newPhase in
+                        switch newPhase {
+                        case .background:
+                            print("📱 App going to background, disconnecting...")
+                            if bleManager.isConnected {
+                                bleManager.disconnect()
+                            }
+                        case .inactive:
+                            print("📱 App inactive")
+                        case .active:
+                            print("📱 App active")
+                        @unknown default:
+                            break
+                        }
+                    }
+                    .onChange(of: bleManager.detectedProblem) { problem in
+                        if problem != nil {
+                            showHelp = true
+                        }
+                    }
+                
+                // Tutorial overlay at top level to cover navigation bar
+                if showInteractiveTutorial {
+                    InteractiveTutorialView(
+                        showTutorial: $showInteractiveTutorial,
+                        hasCompletedOnboarding: $hasCompletedOnboarding,
+                        scanButtonFrame: scanButtonFrame,
+                        button1Frame: button1Frame,
+                        button2Frame: button2Frame,
+                        scrollFrame: scrollFrame,
+                        comboFrame: comboFrame
+                    )
                 }
-                .sheet(isPresented: $showOnboarding) {
-                    OnboardingView(showOnboarding: $showOnboarding)
+                
+                // Centered Rename Custom Popup Overlay (OLD STYLE)
+                if showCustomRenameAlert {
+                    Color.black.opacity(0.4)
+                        .edgesIgnoringSafeArea(.all)
+                        .onTapGesture {
+                            showCustomRenameAlert = false
+                            customRenameText = ""
+                        }
+                    
+                    VStack(spacing: 16) {
+                        Text("Rename Custom")
+                            .font(.headline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.primary)
+                        
+                        TextField("Enter name", text: $customRenameText)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .padding(.horizontal)
+                        
+                        HStack(spacing: 20) {
+                            Button("Cancel") {
+                                showCustomRenameAlert = false
+                                customRenameText = ""
+                            }
+                            .foregroundColor(.red)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 8)
+                            .background(Color.red.opacity(0.1))
+                            .cornerRadius(8)
+                            
+                            Button("Save") {
+                                print("💾 Saving custom name: \(customRenameText) for slot \(customToRename)")
+                                saveCustomName(customToRename, name: customRenameText)
+                                showCustomRenameAlert = false
+                                customRenameText = ""
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 8)
+                            .background(
+                                customRenameText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?
+                                Color.gray : Color.blue
+                            )
+                            .cornerRadius(8)
+                            .disabled(customRenameText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        }
+                        .padding(.top, 10)
+                    }
+                    .padding(.vertical, 24)
+                    .padding(.horizontal, 20)
+                    .frame(width: 300)
+                    .background(Color(UIColor.systemBackground))
+                    .cornerRadius(12)
+                    .shadow(radius: 20)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                    )
                 }
-                .sheet(isPresented: $showHelp) {
-                    HelpView()
-                        .environmentObject(bleManager)
-                }
-                .popover(isPresented: $showCustomRenameAlert, attachmentAnchor: .rect(.rect(
-                .init(x: 0.5, y: 0.5, width: 1, height: 1))), arrowEdge: .top) {
-                    renameCustomPopup
-                        .frame(width: 340, height: 220)
-                        .presentationCompactAdaptation(.popover)
-                }
-                .popover(isPresented: $showSaveConfirmation, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+                
+                // Centered Save Confirmation Popup Overlay (OLD STYLE)
+                if showSaveConfirmation {
+                    Color.black.opacity(0.4)
+                        .edgesIgnoringSafeArea(.all)
+                        .onTapGesture {
+                            showSaveConfirmation = false
+                        }
+                    
                     VStack(spacing: 16) {
                         Text("Save Custom")
                             .font(.headline)
-                            .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                            .fontWeight(.bold)
+                            .foregroundColor(.primary)
                         
-                        Text("Save current configuration as \(getCustomNameForSlot(customToSave))?")
+                        Text("Overwrite existing custom '\(getCustomNameForSlot(customToSave))'?")
                             .multilineTextAlignment(.center)
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal)
                         
                         HStack(spacing: 20) {
-                            Button("No") {
+                            Button("Cancel") {
                                 showSaveConfirmation = false
                             }
-                                .foregroundColor(.red)
+                            .foregroundColor(.red)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 8)
+                            .background(Color.red.opacity(0.1))
+                            .cornerRadius(8)
                             
-                            Button("Yes") {
+                            Button("Confirm") {
                                 saveCustom(slot: customToSave)
-                                let customName = getCustomNameForSlot(customToSave)
-                                savedCustomName = customName
-                                showSaveCustomDropdown.toggle()
                                 showSaveConfirmation = false
+                                
+                                // Show a quick success message
+                                savedCustomName = getCustomNameForSlot(customToSave)
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                    // You could add a toast notification here if desired
+                                }
                             }
-                                .foregroundColor(.blue)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 8)
+                            .background(Color.blue)
+                            .cornerRadius(8)
                         }
-                        .padding(.top, 8)
+                        .padding(.top, 10)
                     }
-                    .padding()
+                    .padding(.vertical, 24)
+                    .padding(.horizontal, 20)
                     .frame(width: 300)
-                    .presentationCompactAdaptation(.popover)
-                }
-                .onAppear {
-                    handleOnAppear()
-                }
-                .onChange(of: scenePhase) { newPhase in
-                    switch newPhase {
-                    case .background:
-                        print("📱 App going to background, disconnecting...")
-                        if bleManager.isConnected {
-                            bleManager.disconnect()
-                        }
-                    case .inactive:
-                        print("📱 App inactive")
-                    case .active:
-                        print("📱 App active")
-                    @unknown default:
-                        break
-                    }
-                }
-                .onChange(of: bleManager.detectedProblem) { problem in
-                    if problem != nil {
-                        showHelp = true
-                    }
-                }
-            
-            // Tutorial overlay at top level to cover navigation bar
-            if showInteractiveTutorial {
-                InteractiveTutorialView(
-                    showTutorial: $showInteractiveTutorial,
-                    hasCompletedOnboarding: $hasCompletedOnboarding,
-                    scanButtonFrame: scanButtonFrame,
-                    button1Frame: button1Frame,
-                    button2Frame: button2Frame,
-                    scrollFrame: scrollFrame,
-                    comboFrame: comboFrame
-                )
-            }
-        }
-        .onChange(of: showCustomRenameAlert) { newValue in
-            print("🔄 showCustomRenameAlert changed to: \(newValue)")
-        }
-    }
-    
-    private var renameCustomPopup: some View {
-        VStack(spacing: 20) {
-            Text("Rename Custom")
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
-            
-            TextField("Enter custom name", text: $customRenameText)
-                .textFieldStyle(RoundedBorderTextFieldStyle())
-                .padding(.horizontal)
-            
-            Text("Enter a name for this custom configuration")
-                .font(.caption)
-                .foregroundColor(.secondary)
-            
-            HStack(spacing: 20) {
-                Button("Cancel") {
-                    showCustomRenameAlert = false
-                    customRenameText = ""
-                }
-                    .foregroundColor(.red)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 10)
-                    .background(Color.red.opacity(0.1))
-                    .cornerRadius(8)
-                
-                Button("Save") {
-                    print("💾 Saving custom name: \(customRenameText) for slot \(customToRename)")
-                    saveCustomName(customToRename, name: customRenameText)
-                    showCustomRenameAlert = false
-                    customRenameText = ""
-                }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 10)
-                    .background(
-                        customRenameText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?
-                        Color.gray : Color.blue
+                    .background(Color(UIColor.systemBackground))
+                    .cornerRadius(12)
+                    .shadow(radius: 20)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.gray.opacity(0.2), lineWidth: 1)
                     )
-                    .cornerRadius(8)
-                    .disabled(customRenameText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
             }
-            .padding(.top, 10)
         }
-        .padding(.vertical, 30)
-        .padding(.horizontal, 20)
     }
     
     private var mainNavigationView: some View {
@@ -317,383 +373,64 @@ struct ContentView: View {
             Color(red: 0.97, green: 0.94, blue: 1.0) // LIGHTER, LESS SATURATED PURPLE
                 .ignoresSafeArea()
             
-            ScrollView {
-                VStack(spacing: 30) {
-                    // Simulator warning
-                    #if targetEnvironment(simulator)
-                    VStack(spacing: 12) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 40))
-                            .foregroundColor(.orange)
-                        Text("Simulator Limitation")
-                            .font(.headline)
-                            .foregroundColor(.orange)
-                        Text("Bluetooth is not supported in the iOS Simulator. Please build and run this app on a real iPad or iPhone to test Bluetooth functionality.")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
-                    }
-                    .padding()
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.orange.opacity(0.1))
-                    )
-                    .padding(.horizontal)
-                    #endif
+            // REMOVED ScrollView - replaced with fixed VStack
+            VStack(spacing: 20) {
+                // Simulator warning
+                #if targetEnvironment(simulator)
+                VStack(spacing: 12) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 40))
+                        .foregroundColor(.orange)
+                    Text("Simulator Limitation")
+                        .font(.headline)
+                        .foregroundColor(.orange)
+                    Text("Bluetooth is not supported in the iOS Simulator. Please build and run this app on a real iPad or iPhone to test Bluetooth functionality.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.orange.opacity(0.1))
+                )
+                .padding(.horizontal)
+                #endif
+                
+                // Controller Diagram Section
+                VStack(spacing: 20) {
+                    Text("Controller Configuration")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.black) // BLACK TEXT
+                        .offset(y: 275) // MOVED DOWN BY 250
                     
-                    // Controller Diagram Section
-                    VStack(spacing: 20) {
-                        Text("Controller Configuration")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(.black) // BLACK TEXT
+                    ZStack {
+                        // Controller outline first (bottom layer) - SCALED BY 1.5x AND MOVED UP BY 100
+                        controllerOutline
+                            .scaleEffect(controllerScale, anchor: .top) // Scale from top
+                            .offset(y: 150) // MOVED DOWN BY 250 (-100 + 250 = 150)
                         
-                        ZStack {
-                            // Controller outline first (bottom layer)
-                            controllerOutline
-                            
-                            // Dark purple connection lines on top of controller
-                            connectionLines
-                            
-                            // Buttons and labels on top of everything
-                            VStack(spacing: 30) {
-                                // Top: Scroll - Button 1 - Button 2 (REORDERED) - MOVED DOWN BY 15
-                                HStack(spacing: 10) {
-                                    // Scroll - Pill/Capsule shape WITH UP/DOWN ARROWS - MOVED TO LEFT - REVERSED COLORS
-                                    VStack(spacing: 8) {
-                                        // INCREASED SIZE OF CURRENT CONFIG DISPLAY WITH WIDER WIDTH - NOW CLICKABLE - REVERSED COLORS
-                                        Button(action: {
-                                            showScrollDropdown = true
-                                        }) {
-                                            Text(getCurrentSelection(for: "scroll"))
-                                                .font(.system(size: 16, weight: .medium))
-                                                .foregroundColor(.white) // WHITE TEXT
-                                                .padding(.horizontal, 12)
-                                                .padding(.vertical, 6)
-                                                .background(Color(red: 0.7, green: 0.5, blue: 0.9).opacity(0.8)) // PASTEL PURPLE BACKGROUND
-                                                .cornerRadius(6)
-                                                .overlay(
-                                                    RoundedRectangle(cornerRadius: 6)
-                                                        .stroke(Color.white, lineWidth: 1) // WHITE BORDER
-                                                )
-                                                .fixedSize(horizontal: false, vertical: true)
-                                                .frame(maxWidth: 180)
-                                        }
-                                        .buttonStyle(PlainButtonStyle())
-                                        
-                                        Button(action: {
-                                            showScrollDropdown = true
-                                        }) {
-                                            ZStack {
-                                                // Main pill-shaped body - PASTEL PURPLE FILL
-                                                Capsule()
-                                                    .fill(Color(red: 0.7, green: 0.5, blue: 0.9).opacity(0.8)) // PASTEL PURPLE FILL
-                                                    .frame(width: 60, height: 100)
-                                                
-                                                // Outer border - WHITE OUTLINE
-                                                Capsule()
-                                                    .stroke(Color.white, lineWidth: 2)
-                                                    .frame(width: 60, height: 100)
-                                                
-                                                // UP/DOWN ARROWS ADDED - WHITE
-                                                VStack(spacing: 4) {
-                                                    Image(systemName: "chevron.up")
-                                                        .font(.system(size: 16, weight: .bold))
-                                                        .foregroundColor(.white) // WHITE
-                                                    
-                                                    Image(systemName: "chevron.down")
-                                                        .font(.system(size: 16, weight: .bold))
-                                                        .foregroundColor(.white) // WHITE
-                                                }
-                                            }
-                                        }
-                                        .buttonStyle(PlainButtonStyle())
-                                        .background(GeometryReader { geo in
-                                            Color.clear.preference(key: ScrollFrameKey.self, value: geo.frame(in: .global))
-                                        })
-                                        .onPreferenceChange(ScrollFrameKey.self) { frame in
-                                            scrollFrame = frame
-                                        }
-                                        
-                                        // Make the label clickable - PASTEL PURPLE TEXT
-                                        Button(action: {
-                                            showScrollDropdown = true
-                                        }) {
-                                            Text("Scroll")
-                                                .font(.system(size: 16, weight: .semibold))
-                                                .foregroundColor(Color(red: 0.7, green: 0.5, blue: 0.9)) // PASTEL PURPLE TEXT
-                                        }
-                                        .buttonStyle(PlainButtonStyle())
-                                    }
-                                    .offset(y: 15)
-                                    .popover(isPresented: $showScrollDropdown, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
-                                        VStack(spacing: 0) {
-                                            ForEach(scrollOptions, id: \.self) { option in
-                                                Button(action: {
-                                                    config["scroll"] = optionToCode(option)
-                                                    saveConfigurationIfConnected()
-                                                    showScrollDropdown = false
-                                                }) {
-                                                    Text(option)
-                                                        .foregroundColor(.primary)
-                                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                                        .padding(.horizontal, 16)
-                                                        .padding(.vertical, 12)
-                                                }
-                                                if option != scrollOptions.last {
-                                                    Divider()
-                                                }
-                                            }
-                                        }
-                                        .padding(.vertical, 8)
-                                        .background(Color.white)
-                                        .cornerRadius(12)
-                                        .shadow(radius: 5)
-                                        .frame(width: 200)
-                                    }
-                                    
-                                    // Button 1 - Larger - MOVED TO MIDDLE (ALIGNED WITH BUTTON 2) - PASTEL RED-PURPLE REVERSED COLORS
-                                    VStack(spacing: 8) {
-                                        // INCREASED SIZE OF CURRENT CONFIG DISPLAY - NOW CLICKABLE - REVERSED COLORS
-                                        Button(action: {
-                                            showButton1Dropdown = true
-                                        }) {
-                                            Text(getCurrentSelection(for: "button1"))
-                                                .font(.system(size: 16, weight: .medium))
-                                                .foregroundColor(.white) // WHITE TEXT
-                                                .padding(.horizontal, 12)
-                                                .padding(.vertical, 6)
-                                                .background(Color(red: 0.85, green: 0.4, blue: 0.7).opacity(0.8)) // PASTEL RED-PURPLE BACKGROUND
-                                                .cornerRadius(6)
-                                                .overlay(
-                                                    RoundedRectangle(cornerRadius: 6)
-                                                        .stroke(Color.white, lineWidth: 1) // WHITE BORDER
-                                                )
-                                                .fixedSize(horizontal: false, vertical: true)
-                                                .frame(maxWidth: 120)
-                                        }
-                                        .buttonStyle(PlainButtonStyle())
-                                        
-                                        // Make the button name clickable - REVERSED COLORS
-                                        Button(action: {
-                                            showButton1Dropdown = true
-                                        }) {
-                                            ZStack {
-                                                Circle()
-                                                    .fill(Color(red: 0.85, green: 0.4, blue: 0.7).opacity(0.8)) // PASTEL RED-PURPLE BACKGROUND
-                                                    .frame(width: 80, height: 80)
-                                                
-                                                Circle()
-                                                    .stroke(Color.white, lineWidth: 2) // WHITE BORDER
-                                                    .frame(width: 80, height: 80)
-                                                
-                                                Text("1")
-                                                    .font(.system(size: 24, weight: .bold))
-                                                    .foregroundColor(.white) // WHITE TEXT
-                                            }
-                                        }
-                                        .buttonStyle(PlainButtonStyle())
-                                        .background(GeometryReader { geo in
-                                            Color.clear.preference(key: ViewFrameKey.self, value: geo.frame(in: .global))
-                                        })
-                                        .onPreferenceChange(ViewFrameKey.self) { frame in
-                                            button1Frame = frame
-                                        }
-                                        
-                                        // Make the label clickable - PASTEL RED-PURPLE TEXT
-                                        Button(action: {
-                                            showButton1Dropdown = true
-                                        }) {
-                                            Text("Button 1")
-                                                .font(.system(size: 16, weight: .semibold))
-                                                .foregroundColor(Color(red: 0.85, green: 0.4, blue: 0.7)) // PASTEL RED-PURPLE TEXT
-                                        }
-                                        .buttonStyle(PlainButtonStyle())
-                                    }
-                                    .offset(y: 15)
-                                    .popover(isPresented: $showButton1Dropdown, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
-                                        VStack(spacing: 0) {
-                                            ForEach(circleButton1Options, id: \.self) { option in
-                                                Button(action: {
-                                                    config["button1"] = optionToCode(option)
-                                                    saveConfigurationIfConnected()
-                                                    showButton1Dropdown = false
-                                                }) {
-                                                    Text(option)
-                                                        .foregroundColor(.primary)
-                                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                                        .padding(.horizontal, 16)
-                                                        .padding(.vertical, 12)
-                                                }
-                                                if option != circleButton1Options.last {
-                                                    Divider()
-                                                }
-                                            }
-                                        }
-                                        .padding(.vertical, 8)
-                                        .background(Color.white)
-                                        .cornerRadius(12)
-                                        .shadow(radius: 5)
-                                        .frame(width: 150)
-                                    }
-                                    
-                                    // Button 2 - Larger - MOVED TO RIGHT - PASTEL BLUE-PURPLE REVERSED COLORS
-                                    VStack(spacing: 8) {
-                                        // INCREASED SIZE OF CURRENT CONFIG DISPLAY - NOW CLICKABLE - REVERSED COLORS
-                                        Button(action: {
-                                            showButton2Dropdown = true
-                                        }) {
-                                            Text(getCurrentSelection(for: "button2"))
-                                                .font(.system(size: 16, weight: .medium))
-                                                .foregroundColor(.white) // WHITE TEXT
-                                                .padding(.horizontal, 12)
-                                                .padding(.vertical, 6)
-                                                .background(Color(red: 0.5, green: 0.4, blue: 0.9).opacity(0.8)) // PASTEL BLUE-PURPLE BACKGROUND
-                                                .cornerRadius(6)
-                                                .overlay(
-                                                    RoundedRectangle(cornerRadius: 6)
-                                                        .stroke(Color.white, lineWidth: 1) // WHITE BORDER
-                                                )
-                                                .fixedSize(horizontal: false, vertical: true)
-                                                .frame(maxWidth: 120)
-                                        }
-                                        .buttonStyle(PlainButtonStyle())
-                                        
-                                        // Make the button name clickable - REVERSED COLORS
-                                        Button(action: {
-                                            showButton2Dropdown = true
-                                        }) {
-                                            ZStack {
-                                                Circle()
-                                                    .fill(Color(red: 0.5, green: 0.4, blue: 0.9).opacity(0.8)) // PASTEL BLUE-PURPLE BACKGROUND
-                                                    .frame(width: 80, height: 80)
-                                                
-                                                Circle()
-                                                    .stroke(Color.white, lineWidth: 2) // WHITE BORDER
-                                                    .frame(width: 80, height: 80)
-                                                
-                                                Text("2")
-                                                    .font(.system(size: 24, weight: .bold))
-                                                    .foregroundColor(.white) // WHITE TEXT
-                                            }
-                                        }
-                                        .buttonStyle(PlainButtonStyle())
-                                        .background(GeometryReader { geo in
-                                            Color.clear.preference(key: Button2FrameKey.self, value: geo.frame(in: .global))
-                                        })
-                                        .onPreferenceChange(Button2FrameKey.self) { frame in
-                                            button2Frame = frame
-                                        }
-                                        
-                                        // Make the label clickable - PASTEL BLUE-PURPLE TEXT
-                                        Button(action: {
-                                            showButton2Dropdown = true
-                                        }) {
-                                            Text("Button 2")
-                                                .font(.system(size: 16, weight: .semibold))
-                                                .foregroundColor(Color(red: 0.5, green: 0.4, blue: 0.9)) // PASTEL BLUE-PURPLE TEXT
-                                        }
-                                        .buttonStyle(PlainButtonStyle())
-                                    }
-                                    .offset(y: 15)
-                                    .popover(isPresented: $showButton2Dropdown, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
-                                        VStack(spacing: 0) {
-                                            ForEach(circleButton2Options, id: \.self) { option in
-                                                Button(action: {
-                                                    config["button2"] = optionToCode(option)
-                                                    saveConfigurationIfConnected()
-                                                    showButton2Dropdown = false
-                                                }) {
-                                                    Text(option)
-                                                        .foregroundColor(.primary)
-                                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                                        .padding(.horizontal, 16)
-                                                        .padding(.vertical, 12)
-                                                }
-                                                if option != circleButton2Options.last {
-                                                    Divider()
-                                                }
-                                            }
-                                        }
-                                        .padding(.vertical, 8)
-                                        .background(Color.white)
-                                        .cornerRadius(12)
-                                        .shadow(radius: 5)
-                                        .frame(width: 150)
-                                    }
-                                }
-                                .padding(.top, 20)
-                                
-                                // Bottom: Buttons 1+2 Combo - MOVED TO BOTTOM - FADED PURPLE WITH MATCHING BUTTON COLORS
+                        connectionLines
+                            .offset(x: 0, y: 255)
+                        
+                        // Buttons and labels on top of everything
+                        VStack(spacing: 30) {
+                            // Top: Scroll - Button 1 - Button 2 (REORDERED) - MOVED UP BY 60
+                            HStack(spacing: 10) {
+                                // Scroll - Pill/Capsule shape WITH UP/DOWN ARROWS - REVERSED COLORS - RESTORE ORIGINAL SIZE
                                 VStack(spacing: 8) {
-                                    // SWITCHED ORDER: BUTTON NOW ABOVE CONFIG DISPLAY - BOTH CLICKABLE
+                                    // INCREASED SIZE OF CURRENT CONFIG DISPLAY WITH WIDER WIDTH - NOW CLICKABLE - REVERSED COLORS
                                     Button(action: {
-                                        showComboDropdown = true
+                                        showScrollDropdown = true
                                     }) {
-                                        HStack(spacing: 6) {
-                                            // Button 1 - MATCHES ACTUAL BUTTON 1 (PASTEL RED-PURPLE REVERSED SCHEME)
-                                            ZStack {
-                                                Circle()
-                                                    .fill(Color(red: 0.85, green: 0.4, blue: 0.7).opacity(0.8)) // PASTEL RED-PURPLE BACKGROUND
-                                                    .frame(width: 28, height: 28)
-                                                
-                                                Circle()
-                                                    .stroke(Color.white, lineWidth: 1) // WHITE BORDER
-                                                    .frame(width: 28, height: 28)
-                                                
-                                                Text("1")
-                                                    .font(.system(size: 12, weight: .bold))
-                                                    .foregroundColor(.white) // WHITE TEXT
-                                            }
-                                            
-                                            // Plus sign - WHITE
-                                            Text("+")
-                                                .font(.system(size: 16, weight: .bold))
-                                                .foregroundColor(.white)
-                                            
-                                            // Button 2 - MATCHES ACTUAL BUTTON 2 (PASTEL BLUE-PURPLE REVERSED SCHEME)
-                                            ZStack {
-                                                Circle()
-                                                    .fill(Color(red: 0.5, green: 0.4, blue: 0.9).opacity(0.8)) // PASTEL BLUE-PURPLE BACKGROUND
-                                                    .frame(width: 28, height: 28)
-                                                
-                                                Circle()
-                                                    .stroke(Color.white, lineWidth: 1) // WHITE BORDER
-                                                    .frame(width: 28, height: 28)
-                                                
-                                                Text("2")
-                                                    .font(.system(size: 12, weight: .bold))
-                                                    .foregroundColor(.white) // WHITE TEXT
-                                            }
-                                        }
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 12)
-                                        .background(Color(red: 0.4, green: 0.2, blue: 0.6).opacity(0.3)) // FADED PURPLE BACKGROUND
-                                        .cornerRadius(8)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 8)
-                                                .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), lineWidth: 2) // DARK PURPLE OUTLINE
-                                        )
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
-                                    .background(GeometryReader { geo in
-                                        Color.clear.preference(key: ComboFrameKey.self, value: geo.frame(in: .global))
-                                    })
-                                    .onPreferenceChange(ComboFrameKey.self) { frame in
-                                        comboFrame = frame
-                                    }
-                                    
-                                    // CONFIG DISPLAY - FADED PURPLE SCHEME
-                                    Button(action: {
-                                        showComboDropdown = true
-                                    }) {
-                                        Text(getCurrentSelection(for: "combo"))
+                                        Text(getCurrentSelection(for: "scroll"))
                                             .font(.system(size: 16, weight: .medium))
                                             .foregroundColor(.white) // WHITE TEXT
                                             .padding(.horizontal, 12)
                                             .padding(.vertical, 6)
-                                            .background(Color(red: 0.4, green: 0.2, blue: 0.6).opacity(0.3)) // FADED PURPLE BACKGROUND
+                                            .background(Color(red: 0.7, green: 0.5, blue: 0.9).opacity(0.8)) // PASTEL PURPLE BACKGROUND
                                             .cornerRadius(6)
                                             .overlay(
                                                 RoundedRectangle(cornerRadius: 6)
@@ -703,15 +440,60 @@ struct ContentView: View {
                                             .frame(maxWidth: 180)
                                     }
                                     .buttonStyle(PlainButtonStyle())
+                                    
+                                    Button(action: {
+                                        showScrollDropdown = true
+                                    }) {
+                                        ZStack {
+                                            // Main pill-shaped body - PASTEL PURPLE FILL - SCALED BY 1.5x (RESTORE ORIGINAL SIZE)
+                                            Capsule()
+                                                .fill(Color(red: 0.7, green: 0.5, blue: 0.9).opacity(0.8)) // PASTEL PURPLE FILL
+                                                .frame(width: 60 * buttonScale, height: 100 * buttonScale) // SCALED BY 1.5x
+                                            
+                                            // Outer border - WHITE OUTLINE
+                                            Capsule()
+                                                .stroke(Color.white, lineWidth: 2)
+                                                .frame(width: 60 * buttonScale, height: 100 * buttonScale) // SCALED BY 1.5x
+                                            
+                                            // UP/DOWN ARROWS ADDED - WHITE - SCALED
+                                            VStack(spacing: 4) {
+                                                Image(systemName: "chevron.up")
+                                                    .font(.system(size: 16 * buttonScale, weight: .bold)) // SCALED
+                                                    .foregroundColor(.white) // WHITE
+                                                
+                                                Image(systemName: "chevron.down")
+                                                    .font(.system(size: 16 * buttonScale, weight: .bold)) // SCALED
+                                                    .foregroundColor(.white) // WHITE
+                                            }
+                                        }
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                    .background(GeometryReader { geo in
+                                        Color.clear.preference(key: ScrollFrameKey.self, value: geo.frame(in: .global))
+                                    })
+                                    .onPreferenceChange(ScrollFrameKey.self) { frame in
+                                        scrollFrame = frame
+                                    }
+                                    
+                                    // Make the label clickable - PASTEL PURPLE TEXT - MOVED DOWN
+                                    Button(action: {
+                                        showScrollDropdown = true
+                                    }) {
+                                        Text("Scroll")
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundColor(Color(red: 0.7, green: 0.5, blue: 0.9)) // PASTEL PURPLE TEXT
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                    .padding(.top, 10) // MOVED DOWN BY 10 POINTS
                                 }
-                                .offset(x: 100, y: 35)
-                                .popover(isPresented: $showComboDropdown, attachmentAnchor: .point(.init(x: 1.37, y: 0.7))) {
+                                .offset(x: -100, y: 205)
+                                .popover(isPresented: $showScrollDropdown, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
                                     VStack(spacing: 0) {
-                                        ForEach(buttons12Options, id: \.self) { option in
+                                        ForEach(scrollOptions, id: \.self) { option in
                                             Button(action: {
-                                                config["combo"] = optionToCode(option)
+                                                config["scroll"] = optionToCode(option)
                                                 saveConfigurationIfConnected()
-                                                showComboDropdown = false
+                                                showScrollDropdown = false
                                             }) {
                                                 Text(option)
                                                     .foregroundColor(.primary)
@@ -719,7 +501,7 @@ struct ContentView: View {
                                                     .padding(.horizontal, 16)
                                                     .padding(.vertical, 12)
                                             }
-                                            if option != buttons12Options.last {
+                                            if option != scrollOptions.last {
                                                 Divider()
                                             }
                                         }
@@ -728,47 +510,443 @@ struct ContentView: View {
                                     .background(Color.white)
                                     .cornerRadius(12)
                                     .shadow(radius: 5)
-                                    .frame(width: 180)
-                                    .presentationCompactAdaptation(.popover)
+                                    .frame(width: 200)
+                                }
+                                
+                                // Button 1 - Larger - MOVED BACK TO ORIGINAL POSITION - PASTEL RED-PURPLE REVERSED COLORS
+                                VStack(spacing: 8) {
+                                    // INCREASED SIZE OF CURRENT CONFIG DISPLAY - NOW CLICKABLE - REVERSED COLORS
+                                    Button(action: {
+                                        showButton1Dropdown = true
+                                    }) {
+                                        Text(getCurrentSelection(for: "button1"))
+                                            .font(.system(size: 16, weight: .medium))
+                                            .foregroundColor(.white) // WHITE TEXT
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 6)
+                                            .background(Color(red: 0.85, green: 0.4, blue: 0.7).opacity(0.8)) // PASTEL RED-PURPLE BACKGROUND
+                                            .cornerRadius(6)
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 6)
+                                                    .stroke(Color.white, lineWidth: 1) // WHITE BORDER
+                                            )
+                                            .fixedSize(horizontal: false, vertical: true)
+                                            .frame(maxWidth: 120)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                    
+                                    // Make the button name clickable - REVERSED COLORS - SCALED BY 1.5x
+                                    Button(action: {
+                                        showButton1Dropdown = true
+                                    }) {
+                                        ZStack {
+                                            Circle()
+                                                .fill(Color(red: 0.85, green: 0.4, blue: 0.7).opacity(0.8)) // PASTEL RED-PURPLE BACKGROUND
+                                                .frame(width: 80 * buttonScale, height: 80 * buttonScale) // SCALED BY 1.5x
+                                            
+                                            Circle()
+                                                .stroke(Color.white, lineWidth: 2) // WHITE BORDER
+                                                .frame(width: 80 * buttonScale, height: 80 * buttonScale) // SCALED BY 1.5x
+                                            
+                                            Text("1")
+                                                .font(.system(size: 24 * buttonScale, weight: .bold)) // SCALED
+                                                .foregroundColor(.white) // WHITE TEXT
+                                        }
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                    .background(GeometryReader { geo in
+                                        Color.clear.preference(key: ViewFrameKey.self, value: geo.frame(in: .global))
+                                    })
+                                    .onPreferenceChange(ViewFrameKey.self) { frame in
+                                        button1Frame = frame
+                                    }
+                                    
+                                    // Make the label clickable - PASTEL RED-PURPLE TEXT - MOVED DOWN
+                                    Button(action: {
+                                        showButton1Dropdown = true
+                                    }) {
+                                        Text("Button 1")
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundColor(Color(red: 0.85, green: 0.4, blue: 0.7)) // PASTEL RED-PURPLE TEXT
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                    .padding(.top, 10) // MOVED DOWN BY 10 POINTS
+                                }
+                                .offset(y: 205) // MOVED DOWN BY 250 (-45 + 250 = 205)
+                                .popover(isPresented: $showButton1Dropdown, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
+                                    VStack(spacing: 0) {
+                                        ForEach(circleButton1Options, id: \.self) { option in
+                                            Button(action: {
+                                                config["button1"] = optionToCode(option)
+                                                saveConfigurationIfConnected()
+                                                showButton1Dropdown = false
+                                            }) {
+                                                Text(option)
+                                                    .foregroundColor(.primary)
+                                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                                    .padding(.horizontal, 16)
+                                                    .padding(.vertical, 12)
+                                            }
+                                            if option != circleButton1Options.last {
+                                                Divider()
+                                            }
+                                        }
+                                    }
+                                    .padding(.vertical, 8)
+                                    .background(Color.white)
+                                    .cornerRadius(12)
+                                    .shadow(radius: 5)
+                                    .frame(width: 150)
+                                }
+                                
+                                // Button 2 - Larger - MOVED BACK TO ORIGINAL POSITION - PASTEL BLUE-PURPLE REVERSED COLORS
+                                VStack(spacing: 8) {
+                                    // INCREASED SIZE OF CURRENT CONFIG DISPLAY - NOW CLICKABLE - REVERSED COLORS
+                                    Button(action: {
+                                        showButton2Dropdown = true
+                                    }) {
+                                        Text(getCurrentSelection(for: "button2"))
+                                            .font(.system(size: 16, weight: .medium))
+                                            .foregroundColor(.white) // WHITE TEXT
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 6)
+                                            .background(Color(red: 0.5, green: 0.4, blue: 0.9).opacity(0.8)) // PASTEL BLUE-PURPLE BACKGROUND
+                                            .cornerRadius(6)
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 6)
+                                                    .stroke(Color.white, lineWidth: 1) // WHITE BORDER
+                                            )
+                                            .fixedSize(horizontal: false, vertical: true)
+                                            .frame(maxWidth: 120)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                    
+                                    // Make the button name clickable - REVERSED COLORS - SCALED BY 1.5x
+                                    Button(action: {
+                                        showButton2Dropdown = true
+                                    }) {
+                                        ZStack {
+                                            Circle()
+                                                .fill(Color(red: 0.5, green: 0.4, blue: 0.9).opacity(0.8)) // PASTEL BLUE-PURPLE BACKGROUND
+                                                .frame(width: 80 * buttonScale, height: 80 * buttonScale) // SCALED BY 1.5x
+                                            
+                                            Circle()
+                                                .stroke(Color.white, lineWidth: 2) // WHITE BORDER
+                                                .frame(width: 80 * buttonScale, height: 80 * buttonScale) // SCALED BY 1.5x
+                                            
+                                            Text("2")
+                                                .font(.system(size: 24 * buttonScale, weight: .bold)) // SCALED
+                                                .foregroundColor(.white) // WHITE TEXT
+                                        }
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                    .background(GeometryReader { geo in
+                                        Color.clear.preference(key: Button2FrameKey.self, value: geo.frame(in: .global))
+                                    })
+                                    .onPreferenceChange(Button2FrameKey.self) { frame in
+                                        button2Frame = frame
+                                    }
+                                    
+                                    // Make the label clickable - PASTEL BLUE-PURPLE TEXT - MOVED DOWN
+                                    Button(action: {
+                                        showButton2Dropdown = true
+                                    }) {
+                                        Text("Button 2")
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundColor(Color(red: 0.5, green: 0.4, blue: 0.9)) // PASTEL BLUE-PURPLE TEXT
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                    .padding(.top, 10) // MOVED DOWN BY 10 POINTS
+                                }
+                                .offset(x: 100, y: 205)
+                                .popover(isPresented: $showButton2Dropdown, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
+                                    VStack(spacing: 0) {
+                                        ForEach(circleButton2Options, id: \.self) { option in
+                                            Button(action: {
+                                                config["button2"] = optionToCode(option)
+                                                saveConfigurationIfConnected()
+                                                showButton2Dropdown = false
+                                            }) {
+                                                Text(option)
+                                                    .foregroundColor(.primary)
+                                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                                    .padding(.horizontal, 16)
+                                                    .padding(.vertical, 12)
+                                            }
+                                            if option != circleButton2Options.last {
+                                                Divider()
+                                            }
+                                        }
+                                    }
+                                    .padding(.vertical, 8)
+                                    .background(Color.white)
+                                    .cornerRadius(12)
+                                    .shadow(radius: 5)
+                                    .frame(width: 150)
                                 }
                             }
-                            .frame(height: 320)
+                            .padding(.top, 20)
                         }
-                    }
-                    .padding(.top, 15)
-                    .padding(.horizontal)
-                
-                    if bleManager.isConnected {
-                        VStack(spacing: 8) {
-                            Image(systemName: "info.circle.fill")
-                                .font(.system(size: 24))
-                                .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
-                            Text("⚠️ While connected, do NOT press the RESET button on the device. It will disconnect and restart.")
-                                .font(.caption)
-                                .multilineTextAlignment(.center)
-                                .foregroundColor(.black)
-                        }
-                        .padding()
-                        .background(RoundedRectangle(cornerRadius: 12).fill(Color(red: 0.4, green: 0.2, blue: 0.6).opacity(0.1)))
-                        .padding(.horizontal)
-                        .padding(.top, 30) // This should work now
-                    }
-                    
-                    // ADDED SPACING BEFORE NOTIFICATION SECTION
-                    Spacer().frame(height: 30)
-                    
-                    // EXTRACTED AND MOVED Status Message Section
-                    if !bleManager.statusMessage.isEmpty {
-                        StatusNotificationView(statusMessage: bleManager.statusMessage)
+                        .frame(height: 320 * controllerScale) // SCALED HEIGHT
                     }
                 }
-                .padding(.vertical)
-                .padding(.bottom, 30) // NOTIFICATION BAR MOVED DOWN BY 30
-            }
-            
-            // Save Custom Button moved to right side of controller
-            VStack {
-                Spacer()
+                .padding(.top, 15)
+                .padding(.horizontal)
+                
+                // VERTICAL ARROW
+                VStack(spacing: 0) {
+                    // VERTICAL ARROW POINTING UP - HALVED LENGTH
+                    GeometryReader { geometry in
+                        ZStack {
+                            // Calculate position for the vertical arrow (centered above click scroll button)
+                            let clickScrollCenterX = geometry.size.width / 2 - 230 // Same X as click scroll
+                            let clickScrollTopY = (geometry.size.height / 2) - (100 * buttonScale * 0.3) + 15 // Position of click scroll minus height
+                            
+                            // Position arrow 20 points above click scroll button, then MOVED DOWN BY 300
+                            let arrowY = clickScrollTopY - 60 + 120 //
+                            
+                            // Vertical arrow line (halved length) pointing UP
+                            Path { path in
+                                let arrowLength: CGFloat = 30
+                                path.move(to: CGPoint(x: clickScrollCenterX, y: arrowY + arrowLength))
+                                path.addLine(to: CGPoint(x: clickScrollCenterX, y: arrowY)) // Pointing UP
+                            }
+                            .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                            
+                            // Arrow head (pointing up)
+                            Path { path in
+                                let arrowSize: CGFloat = 8
+                                path.move(to: CGPoint(x: clickScrollCenterX, y: arrowY))
+                                path.addLine(to: CGPoint(x: clickScrollCenterX - arrowSize, y: arrowY + arrowSize))
+                                path.move(to: CGPoint(x: clickScrollCenterX, y: arrowY))
+                                path.addLine(to: CGPoint(x: clickScrollCenterX + arrowSize, y: arrowY + arrowSize))
+                            }
+                            .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                        }
+                    }
+                    
+                    // CLICK SCROLL BUTTON SECTION - POSITIONED UNDER ARROW
+                    VStack(spacing: 8) {
+                        // Config display for the click scroll button
+                        Button(action: {
+                            showClickScrollDropdown = true
+                        }) {
+                            Text(getCurrentSelection(for: "button3"))
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(.white) // WHITE TEXT
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 3)
+                                .background(Color(red: 0.7, green: 0.5, blue: 0.9).opacity(0.8)) // PASTEL PURPLE BACKGROUND
+                                .cornerRadius(4)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), lineWidth: 2) // DARK PURPLE OUTLINE
+                                )
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: 120)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        
+                        // Click scroll button with finger-clicking symbol
+                        Button(action: {
+                            showClickScrollDropdown = true
+                        }) {
+                            ZStack {
+                                // Main pill-shaped body - PASTEL PURPLE FILL
+                                Capsule()
+                                    .fill(Color(red: 0.7, green: 0.5, blue: 0.9).opacity(0.8)) // PASTEL PURPLE FILL
+                                    .frame(width: 36, height: 60) // Smaller size
+                                
+                                // Outer border
+                                Capsule()
+                                    .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), lineWidth: 2)
+                                    .frame(width: 36, height: 60)
+                                
+                                // FINGER-CLICKING SYMBOL
+                                VStack(spacing: 2) {
+                                    Image(systemName: "hand.tap.fill")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundColor(.white) // WHITE
+                                        .padding(.top, 4)
+                                    
+                                    Circle()
+                                        .fill(Color.white.opacity(0.3))
+                                        .frame(width: 8, height: 8)
+                                        .offset(y: 2)
+                                }
+                            }
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        
+                        // Make the label clickable
+                        Button(action: {
+                            showClickScrollDropdown = true
+                        }) {
+                            Text("Click on Scroll")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(Color(red: 0.7, green: 0.5, blue: 0.9)) // PASTEL PURPLE TEXT
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                    .offset(x: -230, y: 25) // Position under original scroll button, MOVED DOWN BY 25
+                    .popover(isPresented: $showClickScrollDropdown, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
+                        VStack(spacing: 0) {
+                            ForEach(allButtonOptions, id: \.self) { option in
+                                Button(action: {
+                                    config["button3"] = optionToCode(option)
+                                    saveConfigurationIfConnected()
+                                    showClickScrollDropdown = false
+                                }) {
+                                    Text(option)
+                                        .foregroundColor(.primary)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 12)
+                                }
+                                if option != allButtonOptions.last {
+                                    Divider()
+                                }
+                            }
+                        }
+                        .padding(.vertical, 8)
+                        .background(Color.white)
+                        .cornerRadius(12)
+                        .shadow(radius: 5)
+                        .frame(width: 200)
+                    }
+                }
+                .frame(height: 200) // Give it some height
+                
+                VStack(spacing: 8) {
+                    Button(action: {
+                        showComboDropdown = true
+                    }) {
+                        Text(getCurrentSelection(for: "combo"))
+                            .font(.system(size: 16 * 1.0, weight: .medium)) // ORIGINAL SIZE
+                            .foregroundColor(.white) // WHITE TEXT
+                            .padding(.horizontal, 12 * 1.0) // ORIGINAL PADDING
+                            .padding(.vertical, 6 * 1.0) // ORIGINAL PADDING
+                            .background(Color(red: 0.7, green: 0.5, blue: 0.8)) // PURPLE BACKGROUND
+                            .cornerRadius(6 * 1.0) // ORIGINAL CORNER RADIUS
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6 * 1.0)
+                                    .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), lineWidth: 2) // DARK PURPLE OUTLINE
+                            )
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: 180 * 1.0) // ORIGINAL WIDTH
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    
+                    Button(action: {
+                        showComboDropdown = true
+                    }) {
+                        HStack(spacing: 6) {
+                            // Button 1 - MATCHES ACTUAL BUTTON 1 (PASTEL RED-PURPLE REVERSED SCHEME)
+                            ZStack {
+                                Circle()
+                                    .fill(Color(red: 0.85, green: 0.4, blue: 0.7).opacity(0.8)) // PASTEL RED-PURPLE BACKGROUND
+                                    .frame(width: 28 * 1.0, height: 28 * 1.0) // ORIGINAL SIZE
+                                
+                                Circle()
+                                    .stroke(Color.white, lineWidth: 1) // WHITE BORDER
+                                    .frame(width: 28 * 1.0, height: 28 * 1.0)
+                                
+                                Text("1")
+                                    .font(.system(size: 12 * 1.0, weight: .bold)) // ORIGINAL SIZE
+                                    .foregroundColor(.white) // WHITE TEXT
+                            }
+                            
+                            // Plus sign - WHITE
+                            Text("+")
+                                .font(.system(size: 16 * 1.0, weight: .bold)) // ORIGINAL SIZE
+                                .foregroundColor(.white)
+                            
+                            // Button 2 - MATCHES ACTUAL BUTTON 2 (PASTEL BLUE-PURPLE REVERSED SCHEME)
+                            ZStack {
+                                Circle()
+                                    .fill(Color(red: 0.5, green: 0.4, blue: 0.9).opacity(0.8)) // PASTEL BLUE-PURPLE BACKGROUND
+                                    .frame(width: 28 * 1.0, height: 28 * 1.0)
+                                
+                                Circle()
+                                    .stroke(Color.white, lineWidth: 1) // WHITE BORDER
+                                    .frame(width: 28 * 1.0, height: 28 * 1.0)
+                                
+                                Text("2")
+                                    .font(.system(size: 12 * 1.0, weight: .bold))
+                                    .foregroundColor(.white) // WHITE TEXT
+                            }
+                        }
+                        .padding(.horizontal, 16 * 1.0) // ORIGINAL PADDING
+                        .padding(.vertical, 12 * 1.0) // ORIGINAL PADDING
+                        .background(Color(red: 0.7, green: 0.5, blue: 0.8)) // PURPLE BACKGROUND
+                        .cornerRadius(8 * 1.0) // ORIGINAL CORNER RADIUS
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8 * 1.0)
+                                .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), lineWidth: 2) // DARK PURPLE OUTLINE
+                        )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .background(GeometryReader { geo in
+                        Color.clear.preference(key: ComboFrameKey.self, value: geo.frame(in: .global))
+                    })
+                    .onPreferenceChange(ComboFrameKey.self) { frame in
+                        comboFrame = frame
+                    }
+                }
+                .offset(x: 145, y: -95)
+                .popover(isPresented: $showComboDropdown, attachmentAnchor: .point(.trailing), arrowEdge: .trailing) {
+                    VStack(spacing: 0) {
+                        ForEach(buttons12Options, id: \.self) { option in
+                            Button(action: {
+                                config["combo"] = optionToCode(option)
+                                saveConfigurationIfConnected()
+                                showComboDropdown = false
+                            }) {
+                                Text(option)
+                                    .foregroundColor(.primary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 12)
+                            }
+                            if option != buttons12Options.last {
+                                Divider()
+                            }
+                        }
+                    }
+                    .padding(.vertical, 8)
+                    .background(Color.white)
+                    .cornerRadius(12)
+                    .shadow(radius: 5)
+                    .frame(width: 180)
+                    .presentationCompactAdaptation(.popover)
+                }
+                
+                if bleManager.isConnected {
+                    VStack(spacing: 8) {
+                        Image(systemName: "info.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                        Text("⚠️ While connected, do NOT press the RESET button on the device. It will disconnect and restart.")
+                            .font(.caption)
+                            .multilineTextAlignment(.center)
+                            .foregroundColor(.black)
+                    }
+                    .padding()
+                    .background(RoundedRectangle(cornerRadius: 12).fill(Color(red: 0.4, green: 0.2, blue: 0.6).opacity(0.1)))
+                    .padding(.horizontal)
+                    .padding(.top, 30)
+                }
+                
+                // ADDED SPACING BEFORE NOTIFICATION SECTION
+                Spacer().frame(height: 30)
+                
+                // EXTRACTED AND MOVED Status Message Section
+                if !bleManager.statusMessage.isEmpty {
+                    StatusNotificationView(statusMessage: bleManager.statusMessage)
+                        .offset(y: -100) // MOVED UP BY 150
+                }
+                
+                // Save Custom Button - NOW INSIDE THE MAIN VSTACK
                 HStack {
                     Spacer()
                     Button(action: {
@@ -792,19 +970,25 @@ struct ContentView: View {
                         )
                     }
                     .padding(.trailing, 80)
-                    .padding(.bottom, 700)
+                    .padding(.bottom, 100)
+                    .offset(y: -300)
                     .popover(isPresented: $showSaveCustomDropdown, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
                         saveCustomMenuView
                     }
                 }
+                .padding(.top, 20)
+                
+                Spacer()
             }
+            .padding(.vertical)
+            .padding(.bottom, 30)
         }
         .navigationTitle("eSketch Shortcuts")
         .navigationBarTitleDisplayMode(.inline)
     }
     
     @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
+    var toolbarContent: some ToolbarContent {
         // Left toolbar - Bluetooth Scan/Connect button styled like Customs
         ToolbarItem(placement: .navigationBarLeading) {
             HStack(spacing: 10) {
@@ -1001,7 +1185,7 @@ struct ContentView: View {
     }
     
     // MARK: - Lifecycle Methods
-    private func handleOnAppear() {
+    func handleOnAppear() {
         print("📱 ContentView appeared")
         print("📱 hasCompletedOnboarding: \(hasCompletedOnboarding)")
         print("📱 showInteractiveTutorial: \(showInteractiveTutorial)")
@@ -1066,6 +1250,9 @@ struct ContentView: View {
                                         .font(.system(size: 12))
                                         .foregroundColor(.black)
                                     Text("Button 2: \(codeToOption(custom.config["button2"] ?? 0, validOptions: circleButton2Options))")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(.black)
+                                    Text("Click on Scroll: \(codeToOption(custom.config["button3"] ?? 0, validOptions: allButtonOptions))")
                                         .font(.system(size: 12))
                                         .foregroundColor(.black)
                                     Text("Buttons 1 + 2: \(codeToOption(custom.config["combo"] ?? 0, validOptions: buttons12Options))")
@@ -1166,7 +1353,7 @@ struct ContentView: View {
     }
     
     // MARK: - Helper Functions
-    private func getCustomNameForSlot(_ slot: Int) -> String {
+    func getCustomNameForSlot(_ slot: Int) -> String {
         // Ensure slot is valid (1-5)
         guard (1...5).contains(slot) else {
             return "Custom"
@@ -1179,7 +1366,7 @@ struct ContentView: View {
         }
     }
     
-    private func findFirstAvailableSlot() -> Int {
+    func findFirstAvailableSlot() -> Int {
         // Check which custom slots are available (2-5, since 1 is always shown)
         for slot in 2...5 {
             switch slot {
@@ -1197,22 +1384,6 @@ struct ContentView: View {
         }
         // If all slots 2-5 are full, return 2 (this shouldn't happen due to the UI logic)
         return 2
-    }
-    
-    // MARK: - Custom Functions - RENAMED FROM PRESET
-    func loadCustom(from jsonString: String) -> [String: Int]? {
-        guard !jsonString.isEmpty,
-              let jsonData = jsonString.data(using: .utf8) else {
-            return nil
-        }
-        
-        do {
-            let config = try JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Int]
-            return config
-        } catch {
-            print("❌ Failed to load custom: \(error)")
-            return nil
-        }
     }
     
     func saveCustom(slot: Int) {
@@ -1285,16 +1456,14 @@ struct ContentView: View {
                 let containerHeight = geometry.size.height
                 let centerX = containerWidth / 2
                 
-                // Nintendo Switch Joy-Con style outline with smaller cylindrical grips
                 Path { path in
-                    // Main rectangular body - EXTENDED LENGTH BY 30% AND HEIGHT BY 25%, THEN SHORTENED FROM BOTTOM BY 10
                     let bodyWidth: CGFloat = 480 * 1.3 // EXTENDED LENGTH BY 30% (from 480 to 624)
-                    let bodyHeight: CGFloat = (197.5 * 1.25) - 10 // EXTENDED HEIGHT BY 25% THEN SHORTENED FROM BOTTOM BY 10 (from 246.875 to 236.875)
+                    let bodyHeight: CGFloat = (197.5 * 1.25) - 45 // EXTENDED HEIGHT BY 25% THEN SHORTENED FROM BOTTOM BY 10, THEN CUT 30 MORE
                     let cornerRadius: CGFloat = 23.5 // Keep current corners
                     
                     let bodyRect = CGRect(
                         x: centerX - bodyWidth / 2,
-                        y: containerHeight / 2 - bodyHeight / 2 - 30, // MOVED UP BY ANOTHER 20 (from -10 to -30)
+                        y: containerHeight / 2 - bodyHeight / 2 - 40, // MOVED UP BY ANOTHER 20 (from -30 to -50)
                         width: bodyWidth,
                         height: bodyHeight
                     )
@@ -1319,53 +1488,54 @@ struct ContentView: View {
                 // SHIFT EVERYTHING RIGHT BY 80 TOTAL
                 let offset: CGFloat = 100
                 
-                // DARK PURPLE lines positioned above the outline - MOVED UP BY 2 (from -20 to -22)
+                // DARK PURPLE lines positioned above the outline - MOVED UP BY 100 (from 438 to 338)
                 // UPDATED POSITIONS FOR NEW LAYOUT: Scroll ~> Button 1 ~> Button 2
                 let button1CenterX = centerX - 60 + offset // Button 1 center position (left of center) + offset
                 let button2CenterX = centerX + 60 + offset // Button 2 center position (right of center) + offset
-                
-                // Position lines to match the text position - MOVED UP BY 2 (from -20 to -22)
-                let buttonBottomY: CGFloat = 208 // MOVED UP BY 2 (from 210 to 208)
-                let horizontalLineY: CGFloat = 238 // MOVED UP BY 2 (from 240 to 238)
-                let textTopY: CGFloat = 258 // MOVED UP BY 2 (from 260 to 258)
-                
-                // EXTEND LEFT ENDPOINT BY 10, keep right endpoint the same
+
+                // Position lines MOVED UP BY 100
+                let buttonBottomY: CGFloat = 308 // MOVED UP BY 100 (from 408 to 308)
+                let horizontalLineY: CGFloat = 338 // MOVED UP BY 100 (from 438 to 338)
+                let textTopY: CGFloat = 358 // MOVED UP BY 100 (from 458 to 358)
+
+                // EXTEND LEFT ENDPOINT BY 10, EXTEND RIGHT ENDPOINT BY 100
                 let horizontalLineStartX = button1CenterX - 10 // Extended left by 10
-                let horizontalLineEndX = button2CenterX        // Keep right endpoint the same
+                let horizontalLineEndX = button2CenterX + 100   // Extended right by 100
                 
                 // FIXED: Vertical line from EXTENDED LEFT ENDPOINT down (under Button 1)
                 Path { path in
-                    path.move(to: CGPoint(x: horizontalLineStartX, y: buttonBottomY)) // Now at extended endpoint
-                    path.addLine(to: CGPoint(x: horizontalLineStartX, y: horizontalLineY)) // Now at extended endpoint
+                    path.move(to: CGPoint(x: horizontalLineStartX, y: buttonBottomY))
+                    path.addLine(to: CGPoint(x: horizontalLineStartX, y: horizontalLineY))
                 }
-                .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), style: StrokeStyle(lineWidth: 2)) // DARK PURPLE
+                .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), style: StrokeStyle(lineWidth: 2))
                 
-                // Vertical line from right endpoint down (under Button 2)
+                // Vertical line from EXTENDED RIGHT ENDPOINT down (under Button 2)
                 Path { path in
                     path.move(to: CGPoint(x: horizontalLineEndX, y: buttonBottomY))
                     path.addLine(to: CGPoint(x: horizontalLineEndX, y: horizontalLineY))
                 }
-                .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), style: StrokeStyle(lineWidth: 2)) // DARK PURPLE
+                .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), style: StrokeStyle(lineWidth: 2))
                 
-                // EXTENDED Horizontal line connecting both vertical lines (starts 10 left of Button 1)
+                // EXTENDED Horizontal line connecting both vertical lines
                 Path { path in
-                    path.move(to: CGPoint(x: horizontalLineStartX, y: horizontalLineY)) // Extended left by 10
+                    path.move(to: CGPoint(x: horizontalLineStartX, y: horizontalLineY))
                     path.addLine(to: CGPoint(x: horizontalLineEndX, y: horizontalLineY))
                 }
-                .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), style: StrokeStyle(lineWidth: 2)) // DARK PURPLE
+                .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), style: StrokeStyle(lineWidth: 2))
                 
                 // Vertical line from horizontal line down to Buttons 1+2 text (CENTERED WITH OFFSET)
                 Path { path in
-                    path.move(to: CGPoint(x: centerX + offset, y: horizontalLineY)) // Center + offset
-                    path.addLine(to: CGPoint(x: centerX + offset, y: textTopY)) // Center + offset
+                    let centerPointX = (horizontalLineStartX + horizontalLineEndX) / 2
+                    path.move(to: CGPoint(x: centerPointX, y: horizontalLineY))
+                    path.addLine(to: CGPoint(x: centerPointX, y: textTopY))
                 }
-                .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), style: StrokeStyle(lineWidth: 2)) // DARK PURPLE
+                .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), style: StrokeStyle(lineWidth: 2))
                 
                 // ADD ARROWS TO THE TIP OF VERTICAL DARK PURPLE LINES POINTING UP AT BUTTONS
-                // FIXED: Left arrow at EXTENDED ENDPOINT (under Button 1)
+                // FIXED: Left arrow at EXTENDED LEFT ENDPOINT (under Button 1)
                 Path { path in
                     let arrowSize: CGFloat = 8
-                    let tipX = horizontalLineStartX // Arrow now at extended endpoint
+                    let tipX = horizontalLineStartX
                     let tipY = buttonBottomY
                     
                     path.move(to: CGPoint(x: tipX, y: tipY))
@@ -1373,9 +1543,9 @@ struct ContentView: View {
                     path.move(to: CGPoint(x: tipX, y: tipY))
                     path.addLine(to: CGPoint(x: tipX + arrowSize, y: tipY + arrowSize))
                 }
-                .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), style: StrokeStyle(lineWidth: 2, lineCap: .round)) // DARK PURPLE
+                .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), style: StrokeStyle(lineWidth: 2, lineCap: .round))
                 
-                // Right arrow (under Button 2)
+                // Right arrow at EXTENDED RIGHT ENDPOINT (under Button 2)
                 Path { path in
                     let arrowSize: CGFloat = 8
                     let tipX = horizontalLineEndX
@@ -1386,7 +1556,7 @@ struct ContentView: View {
                     path.move(to: CGPoint(x: tipX, y: tipY))
                     path.addLine(to: CGPoint(x: tipX + arrowSize, y: tipY + arrowSize))
                 }
-                .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), style: StrokeStyle(lineWidth: 2, lineCap: .round)) // DARK PURPLE
+                .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), style: StrokeStyle(lineWidth: 2, lineCap: .round))
             }
         }
         .allowsHitTesting(false)
@@ -1401,6 +1571,8 @@ struct ContentView: View {
             return codeToOption(code, validOptions: circleButton1Options)
         case "button2":
             return codeToOption(code, validOptions: circleButton2Options)
+        case "button3":
+            return codeToOption(code, validOptions: allButtonOptions)
         case "combo":
             return codeToOption(code, validOptions: buttons12Options)
         default:

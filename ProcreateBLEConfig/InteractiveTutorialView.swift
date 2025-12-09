@@ -61,6 +61,13 @@ struct InteractiveTutorialView: View {
             actionRequired: true
         ),
         TutorialStep(
+            title: "3-Position Switch",
+            description: "Your device has a 3-position switch that lets you switch between Custom 1, 2, and 3 presets. Configure each preset by moving the switch and saving different settings!",
+            highlightArea: nil,
+            systemIcon: "switch.2",
+            actionRequired: false
+        ),
+        TutorialStep(
             title: "You're All Set!",
             description: "Open Procreate and start drawing. Your buttons are ready to use!",
             highlightArea: nil,
