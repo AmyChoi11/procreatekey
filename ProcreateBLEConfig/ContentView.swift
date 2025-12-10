@@ -1693,16 +1693,6 @@ struct DeviceRowButton: View {
                         .background(Color.blue.opacity(0.1))
                         .cornerRadius(8)
                 }
-                        .cornerRadius(8)
-                } else {
-                    Text("Connect")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.blue)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.blue.opacity(0.1))
-                        .cornerRadius(8)
-                }
             }
             .padding(.horizontal)
             .padding(.vertical, 8)
