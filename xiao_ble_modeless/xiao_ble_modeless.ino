@@ -343,8 +343,10 @@ void loadCustom(int customNum) {
     Serial.printf("   Button 1: %d, Button 2: %d, Button 3: %d, Combo: %d, Scroll: %d\n",
                   config.button1, config.button2, config.button3, config.combo, config.scroll);
   } else {
-    // Custom not saved yet - use default config
-    Serial.printf("⚠️ %s not configured - using defaults\n", getCustomName(customNum));
+    // Custom not saved yet - keep current config (inherit from previous)
+    Serial.printf("⚠️ %s not saved - keeping current config\n", getCustomName(customNum));
+    Serial.printf("   Button 1: %d, Button 2: %d, Button 3: %d, Combo: %d, Scroll: %d\n",
+                  config.button1, config.button2, config.button3, config.combo, config.scroll);
   }
   
   prefs.end();

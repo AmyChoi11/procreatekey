@@ -1594,47 +1594,15 @@ struct DeviceSheetView: View {
                             .padding(.top, 16)
                     } else {
                         ForEach(bleManager.devices, id: \.identifier) { device in
-                            Button(action: {
-                                bleManager.connect(to: device)
-                                isPresented = false
-                            }) {
-                                HStack {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(device.name ?? "Unknown Device")
-                                            .font(.system(size: 14, weight: .medium))
-                                            .foregroundColor(.primary)
-                                        
-                                        Text(device.identifier.uuidString)
-                                            .font(.system(size: 11))
-                                            .foregroundColor(.secondary)
-                                    }
-                                    Spacer()
-                                    let isThisDeviceConnected = bleManager.isConnected && bleManager.connectedDevice?.identifier == device.identifier
-                                    if isThisDeviceConnected {
-                                        Text("Connected")
-                                            .font(.system(size: 11, weight: .medium))
-                                            .foregroundColor(.green)
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 4)
-                                            .background(Color.green.opacity(0.1))
-                                            .cornerRadius(8)
-                                    } else {
-                                        Text("Connect")
-                                            .font(.system(size: 11, weight: .medium))
-                                            .foregroundColor(.blue)
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 4)
-                                            .background(Color.blue.opacity(0.1))
-                                            .cornerRadius(8)
-                                    }
+                            DeviceRowButton(
+                                device: device,
+                                isConnected: bleManager.isConnected,
+                                connectedDeviceId: bleManager.connectedDevice?.identifier,
+                                onTap: {
+                                    bleManager.connect(to: device)
+                                    isPresented = false
                                 }
-                                .padding(.horizontal)
-                                .padding(.vertical, 8)
-                                .background(Color.white)
-                                .cornerRadius(10)
-                                .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
-                            }
-                            .buttonStyle(PlainButtonStyle())
+                            )
                         }
                     }
                 }
@@ -1670,6 +1638,59 @@ struct DeviceSheetView: View {
         .background(Color(UIColor.systemGroupedBackground))
         .cornerRadius(20)
         .shadow(radius: 20)
+    }
+}
+
+// MARK: - Device Row Button
+struct DeviceRowButton: View {
+    let device: CBPeripheral
+    let isConnected: Bool
+    let connectedDeviceId: UUID?
+    let onTap: () -> Void
+    
+    private var isThisDeviceConnected: Bool {
+        isConnected && connectedDeviceId == device.identifier
+    }
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(device.name ?? "Unknown Device")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.primary)
+                    
+                    Text(device.identifier.uuidString)
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+                
+                if isThisDeviceConnected {
+                    Text("Connected")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.green)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.green.opacity(0.1))
+                        .cornerRadius(8)
+                } else {
+                    Text("Connect")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.blue)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.blue.opacity(0.1))
+                        .cornerRadius(8)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+            .background(Color.white)
+            .cornerRadius(10)
+            .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 
