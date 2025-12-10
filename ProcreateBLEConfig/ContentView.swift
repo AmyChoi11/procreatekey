@@ -791,53 +791,61 @@ struct ContentView: View {
                                     .frame(width: 200)
                                 }
                             }
-                            .frame(height: 200) // Give it some height
                             
-                            VStack(spacing: 8) {
-                                Button(action: {
-                                    showComboDropdown = true
-                                }) {
-                                    Text(getCurrentSelection(for: "combo"))
-                                        .font(.system(size: 14, weight: .medium))
+                            // MIDDLE ROW: Buttons 1+2 Combo
+                            HStack(alignment: .top, spacing: 16) {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text("Buttons 1 + 2 Combo")
+                                        .font(.system(size: 12, weight: .semibold))
                                         .foregroundColor(.white)
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 6)
-                                        .background(Color(red: 0.7, green: 0.5, blue: 0.9).opacity(0.8))
-                                        .cornerRadius(6)
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                                
-                                Text("Press both buttons together for a secondary shortcut.")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(Color.white.opacity(0.7))
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                            .popover(isPresented: $showButtons12Dropdown,
-                                     attachmentAnchor: .point(.bottom),
-                                     arrowEdge: .top) {
-                                VStack(spacing: 0) {
-                                    ForEach(buttons12Options, id: \.self) { option in
-                                        Button(action: {
-                                            config["combo"] = optionToCode(option)
-                                            saveConfigurationIfConnected()
-                                            showButtons12Dropdown = false
-                                        }) {
-                                            Text(option)
-                                                .foregroundColor(.primary)
-                                                .frame(maxWidth: .infinity, alignment: .leading)
-                                                .padding(.horizontal, 16)
-                                                .padding(.vertical, 12)
+                                    
+                                    Text("Press both buttons together for a secondary shortcut.")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(Color.white.opacity(0.8))
+                                        .fixedSize(horizontal: false, vertical: true)
+                                    
+                                    Button(action: {
+                                        showButtons12Dropdown = true
+                                    }) {
+                                        Text(getCurrentSelection(for: "combo"))
+                                            .font(.system(size: 14, weight: .medium))
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 6)
+                                            .background(Color(red: 0.7, green: 0.5, blue: 0.9).opacity(0.8))
+                                            .cornerRadius(6)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                    .popover(isPresented: $showButtons12Dropdown,
+                                             attachmentAnchor: .point(.bottom),
+                                             arrowEdge: .top) {
+                                        VStack(spacing: 0) {
+                                            ForEach(buttons12Options, id: \.self) { option in
+                                                Button(action: {
+                                                    config["combo"] = optionToCode(option)
+                                                    saveConfigurationIfConnected()
+                                                    showButtons12Dropdown = false
+                                                }) {
+                                                    Text(option)
+                                                        .foregroundColor(.primary)
+                                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                                        .padding(.horizontal, 16)
+                                                        .padding(.vertical, 12)
+                                                }
+                                                if option != buttons12Options.last {
+                                                    Divider()
+                                                }
+                                            }
                                         }
-                                        if option != buttons12Options.last {
-                                            Divider()
-                                        }
+                                        .padding(.vertical, 8)
+                                        .background(Color.white)
+                                        .cornerRadius(12)
+                                        .shadow(radius: 5)
+                                        .frame(width: 220)
                                     }
                                 }
-                                .padding(.vertical, 8)
-                                .background(Color.white)
-                                .cornerRadius(12)
-                                .shadow(radius: 5)
-                                .frame(width: 220)
+                                
+                                Spacer()
                             }
                         }
                         
