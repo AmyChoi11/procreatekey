@@ -1621,7 +1621,6 @@ struct DeviceSheetView: View {
             DeviceRowButton(
                 device: device,
                 isConnected: bleManager.isConnected,
-                connectedDeviceId: bleManager.connectedDevice?.identifier,
                 onTap: {
                     bleManager.connect(to: device)
                     isPresented = false
@@ -1661,12 +1660,7 @@ struct DeviceSheetView: View {
 struct DeviceRowButton: View {
     let device: CBPeripheral
     let isConnected: Bool
-    let connectedDeviceId: UUID?
     let onTap: () -> Void
-    
-    private var isThisDeviceConnected: Bool {
-        isConnected && connectedDeviceId == device.identifier
-    }
     
     var body: some View {
         Button(action: onTap) {
@@ -1682,13 +1676,23 @@ struct DeviceRowButton: View {
                 }
                 Spacer()
                 
-                if isThisDeviceConnected {
+                if isConnected {
                     Text("Connected")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.green)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(Color.green.opacity(0.1))
+                        .cornerRadius(8)
+                } else {
+                    Text("Connect")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.blue)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.blue.opacity(0.1))
+                        .cornerRadius(8)
+                }
                         .cornerRadius(8)
                 } else {
                     Text("Connect")
