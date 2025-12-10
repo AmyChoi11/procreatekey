@@ -90,7 +90,7 @@ struct ProblemNotificationView: View {
             .cornerRadius(10)
             .overlay(
                 RoundedRectangle(cornerRadius: 10)
-                    .stroke(color.opacity(0.5), lineWidth: 1)
+                    .stroke(Color.yellow.opacity(0.5), lineWidth: 1)
             )
             .padding(.horizontal)
         )
@@ -1609,7 +1609,8 @@ struct DeviceSheetView: View {
                                             .foregroundColor(.secondary)
                                     }
                                     Spacer()
-                                    if bleManager.isConnected && bleManager.connectedDevice?.identifier == device.identifier {
+                                    let isThisDeviceConnected = bleManager.isConnected && bleManager.connectedDevice?.identifier == device.identifier
+                                    if isThisDeviceConnected {
                                         Text("Connected")
                                             .font(.system(size: 11, weight: .medium))
                                             .foregroundColor(.green)
