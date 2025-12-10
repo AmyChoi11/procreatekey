@@ -14,45 +14,158 @@ struct StatusNotificationView: View {
         let backgroundColor: Color
         let borderColor: Color
         
-        if isSuccess {
+        if isBluetoothReady {
+            iconName = "dot.radiowaves.left.and.right"
+            iconColor = Color.blue
+            backgroundColor = Color.blue.opacity(0.1)
+            borderColor = Color.blue.opacity(0.5)
+        } else if isSuccess {
             iconName = "checkmark.circle.fill"
-            iconColor = .green
+            iconColor = Color.green
             backgroundColor = Color.green.opacity(0.1)
-            borderColor = Color.green.opacity(0.2)
-        } else if isBluetoothReady {
-            iconName = "exclamationmark.circle.fill"
-            iconColor = Color(red: 1.0, green: 0.85, blue: 0.4) // PASTEL YELLOW
-            backgroundColor = Color(red: 1.0, green: 0.85, blue: 0.4).opacity(0.1) // PASTEL YELLOW BACKGROUND
-            borderColor = Color(red: 1.0, green: 0.85, blue: 0.4).opacity(0.2) // PASTEL YELLOW BORDER
-        } else {
-            iconName = "xmark.circle.fill"
-            iconColor = .red
+            borderColor = Color.green.opacity(0.5)
+        } else if statusMessage.contains("error") || statusMessage.contains("failed") || statusMessage.contains("disconnected") {
+            iconName = "xmark.octagon.fill"
+            iconColor = Color.red
             backgroundColor = Color.red.opacity(0.1)
-            borderColor = Color.red.opacity(0.2)
+            borderColor = Color.red.opacity(0.5)
+        } else {
+            iconName = "info.circle.fill"
+            iconColor = Color.orange
+            backgroundColor = Color.orange.opacity(0.1)
+            borderColor = Color.orange.opacity(0.5)
         }
         
-        return HStack(alignment: .top, spacing: 12) {
+        return HStack(alignment: .center, spacing: 10) {
             Image(systemName: iconName)
-                .font(.system(size: 20))
                 .foregroundColor(iconColor)
+                .font(.system(size: 16, weight: .medium))
             
             Text(statusMessage)
-                .font(.subheadline)
-                .foregroundColor(.black)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.primary)
+                .lineLimit(2)
                 .multilineTextAlignment(.leading)
-                .fixedSize(horizontal: false, vertical: true)
+            
+            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(backgroundColor)
-        )
+        .padding(10)
+        .background(backgroundColor)
+        .cornerRadius(10)
         .overlay(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: 10)
                 .stroke(borderColor, lineWidth: 1)
         )
         .padding(.horizontal)
+    }
+}
+
+// MARK: - Problem Notification View
+struct ProblemNotificationView: View {
+    let problem: DetectedProblem?
+    
+    var body: some View {
+        guard let problem = problem else {
+            return AnyView(EmptyView())
+        }
+        
+        let title: String
+        let iconName: String
+        let color: Color
+        
+        switch problem {
+        case .ipadZoom:
+            title = "Zoom Level Issue"
+            iconName = "exclamationmark.triangle.fill"
+            color = .orange
+        case .unknown(let message):
+            title = "Notice"
+            iconName = "info.circle.fill"
+            color = .blue
+            print("🔍 Unknown problem: \(message)")
+        }
+        
+        return AnyView(
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: iconName)
+                        .foregroundColor(color)
+                        .font(.system(size: 16, weight: .bold))
+                    Text(title)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(color)
+                }
+                
+                switch problem {
+                case .ipadZoom:
+                    Text("If your gestures aren't matching what you expect, check your iPad zoom settings. Make sure:\n• Display Zoom is set to 'Standard'\n• Zoom accessibility feature is turned off")
+                        .font(.system(size: 12))
+                        .foregroundColor(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                case .unknown(let message):
+                    Text(message)
+                        .font(.system(size: 12))
+                        .foregroundColor(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(12)
+            .background(Color.yellow.opacity(0.1))
+            .cornerRadius(10)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(color.opacity(0.5), lineWidth: 1)
+            )
+            .padding(.horizontal)
+        )
+    }
+}
+
+// MARK: - Help Bubble View
+struct HelpBubbleView: View {
+    let text: String
+    
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "lightbulb.fill")
+                .foregroundColor(Color.yellow)
+                .font(.system(size: 14))
+                .padding(.top, 2)
+            
+            Text(text)
+                .font(.system(size: 12))
+                .foregroundColor(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(10)
+        .background(Color.yellow.opacity(0.1))
+        .cornerRadius(10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.yellow.opacity(0.4), lineWidth: 1)
+        )
+        .padding(.horizontal)
+    }
+}
+
+// MARK: - Popup Background View Modifier
+struct PopupBackground<Content: View>: View {
+    let content: Content
+    
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+    
+    var body: some View {
+        ZStack {
+            // Dimmed background
+            Color.black.opacity(0.3)
+                .edgesIgnoringSafeArea(.all)
+            
+            content
+        }
+        .transition(.opacity)
+        .animation(.easeInOut, value: UUID())
     }
 }
 
@@ -63,7 +176,13 @@ struct ContentView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     
     // Store configuration as numeric codes - UPDATED DEFAULT SETTINGS
-    @State private var config: [String: Int] = ["button1": 3, "button2": 5, "button3": 3, "combo": 8, "scroll": 6]  // Undo, Erase, Undo (click scroll), Brush Library, Brush Size 5%
+    @State private var config: [String: Int] = [
+        "button1": 3,   // Undo
+        "button2": 5,   // Erase
+        "button3": 3,   // Click on Scroll -> Undo
+        "combo": 8,     // Brush Library
+        "scroll": 6     // Brush Size ±5%
+    ]
     @State private var showDeviceSheet = false
     @State private var hasShownInitialSheet = false
     @State private var showOnboarding = false
@@ -81,6 +200,7 @@ struct ContentView: View {
     @State private var showScrollDropdown = false
     @State private var showButton1Dropdown = false
     @State private var showButton2Dropdown = false
+    @State private var showButtons12Dropdown = false
     @State private var showComboDropdown = false
     @State private var showCustomsDropdown = false
     @State private var showHelpDropdown = false
@@ -93,14 +213,12 @@ struct ContentView: View {
     @State private var customRenameText: String = ""
     @State private var showSaveConfirmation = false
     @State private var savedCustomName = ""
-    @State private var customToSave: Int = 0
+    @State private var customToSave: Int = 1
     
     // Preset system - RENAMED TO CUSTOMS
     @AppStorage("custom1") private var custom1Data: String = ""
     @AppStorage("custom2") private var custom2Data: String = ""
     @AppStorage("custom3") private var custom3Data: String = ""
-    @AppStorage("custom4") private var custom4Data: String = ""
-    @AppStorage("custom5") private var custom5Data: String = ""
     
     // Combined options for all buttons (excluding brush size settings for buttons)
     let allButtonOptions = ["Undo", "Redo", "Erase", "Color Palette", "Brush Library"]
@@ -115,22 +233,47 @@ struct ContentView: View {
     struct Custom: Identifiable {
         let id: Int
         var name: String
-        let config: [String: Int]
+        var config: [String: Int]
     }
     
-    // MARK: - Custom Functions - RENAMED FROM PRESET (MOVED BEFORE customs PROPERTY)
-    func loadCustom(from jsonString: String) -> [String: Int]? {
-        guard !jsonString.isEmpty,
-              let jsonData = jsonString.data(using: .utf8) else {
-            return nil
-        }
+    // Load custom configuration from stored JSON string
+    func loadCustom(from jsonString: String) -> Custom? {
+        guard !jsonString.isEmpty else { return nil }
+        
+        guard let jsonData = jsonString.data(using: .utf8) else { return nil }
         
         do {
-            let config = try JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Int]
-            return config
+            if let dict = try JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any] {
+                if let name = dict["name"] as? String,
+                   let configDict = dict["config"] as? [String: Int],
+                   let id = dict["id"] as? Int {
+                    return Custom(id: id, name: name, config: configDict)
+                } else if let configDict = dict["config"] as? [String: Int] {
+                    return Custom(id: 0, name: "Custom", config: configDict)
+                } else if let configDict = dict as? [String: Int] {
+                    return Custom(id: 0, name: "Custom", config: configDict)
+                }
+            } else if let configDict = try JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Int] {
+                return Custom(id: 0, name: "Custom", config: configDict)
+            }
         } catch {
-            print("❌ Failed to load custom: \(error)")
-            return nil
+            print("❌ Failed to parse custom: \(error)")
+        }
+        
+        return nil
+    }
+    
+    // Helper to get a readable name for stored custom from AppStorage
+    func storedCustomName(for key: String) -> String {
+        switch key {
+        case "custom1":
+            return UserDefaults.standard.string(forKey: "custom1Name") ?? "Custom 1"
+        case "custom2":
+            return UserDefaults.standard.string(forKey: "custom2Name") ?? "Custom 2"
+        case "custom3":
+            return UserDefaults.standard.string(forKey: "custom3Name") ?? "Custom 3"
+        default:
+            return "Custom"
         }
     }
     
@@ -139,34 +282,30 @@ struct ContentView: View {
         
         if let custom1 = loadCustom(from: custom1Data) {
             let name = UserDefaults.standard.string(forKey: "custom1Name") ?? "Custom 1"
-            availableCustoms.append(Custom(id: 1, name: name, config: custom1))
+            availableCustoms.append(Custom(id: 1, name: name, config: custom1.config))
         }
         
         if let custom2 = loadCustom(from: custom2Data) {
             let name = UserDefaults.standard.string(forKey: "custom2Name") ?? "Custom 2"
-            availableCustoms.append(Custom(id: 2, name: name, config: custom2))
+            availableCustoms.append(Custom(id: 2, name: name, config: custom2.config))
         }
         
         if let custom3 = loadCustom(from: custom3Data) {
             let name = UserDefaults.standard.string(forKey: "custom3Name") ?? "Custom 3"
-            availableCustoms.append(Custom(id: 3, name: name, config: custom3))
-        }
-        
-        if let custom4 = loadCustom(from: custom4Data) {
-            let name = UserDefaults.standard.string(forKey: "custom4Name") ?? "Custom 4"
-            availableCustoms.append(Custom(id: 4, name: name, config: custom4))
-        }
-        
-        if let custom5 = loadCustom(from: custom5Data) {
-            let name = UserDefaults.standard.string(forKey: "custom5Name") ?? "Custom 5"
-            availableCustoms.append(Custom(id: 5, name: name, config: custom5))
+            availableCustoms.append(Custom(id: 3, name: name, config: custom3.config))
         }
         
         return availableCustoms
     }
     
     // DEFAULT CONFIGURATION
-    private let defaultConfig: [String: Int] = ["button1": 3, "button2": 5, "button3": 3, "combo": 8, "scroll": 6]  // Undo, Erase, Undo (click), Brush Library, Brush Size 5%
+    private let defaultConfig: [String: Int] = [
+        "button1": 3,   // Undo
+        "button2": 5,   // Erase
+        "button3": 3,   // Click on Scroll -> Undo
+        "combo": 8,     // Brush Library
+        "scroll": 6     // Brush Size ±5%
+    ]  // Undo, Erase, Brush Library, Brush Size 5%
     
     // SCALING CONSTANTS
     private let controllerScale: CGFloat = 1.5
@@ -174,326 +313,489 @@ struct ContentView: View {
     
     var body: some View {
         GeometryReader { geometry in
-            // Replace the entire main ZStack structure with:
             ZStack {
-                mainNavigationView
-                    .sheet(isPresented: $showDeviceSheet) {
-                        DeviceSelectionSheet(bleManager: bleManager, showDeviceSheet: $showDeviceSheet)
-                    }
-                    .sheet(isPresented: $showOnboarding) {
-                        OnboardingView(showOnboarding: $showOnboarding)
-                    }
-                    .sheet(isPresented: $showHelp) {
-                        HelpView()
-                            .environmentObject(bleManager)
-                    }
-                    .onAppear {
-                        handleOnAppear()
-                    }
-                    .onChange(of: scenePhase) { newPhase in
-                        switch newPhase {
-                        case .background:
-                            print("📱 App going to background, disconnecting...")
-                            if bleManager.isConnected {
-                                bleManager.disconnect()
-                            }
-                        case .inactive:
-                            print("📱 App inactive")
-                        case .active:
-                            print("📱 App active")
-                        @unknown default:
-                            break
-                        }
-                    }
-                    .onChange(of: bleManager.detectedProblem) { problem in
-                        if problem != nil {
-                            showHelp = true
-                        }
-                    }
+                // Determine device width for layout adjustments
+                let isSmallDevice = geometry.size.width < 380
                 
-                // Tutorial overlay at top level to cover navigation bar
-                if showInteractiveTutorial {
-                    InteractiveTutorialView(
-                        showTutorial: $showInteractiveTutorial,
-                        hasCompletedOnboarding: $hasCompletedOnboarding,
-                        scanButtonFrame: scanButtonFrame,
-                        button1Frame: button1Frame,
-                        button2Frame: button2Frame,
-                        scrollFrame: scrollFrame,
-                        comboFrame: comboFrame
-                    )
-                }
+                // Background color matching original controllers mockup
+                Color(hue: 0.6, saturation: 0.2, brightness: 0.15)
+                    .ignoresSafeArea()
                 
-                // Centered Rename Custom Popup Overlay (OLD STYLE)
-                if showCustomRenameAlert {
-                    Color.black.opacity(0.4)
-                        .edgesIgnoringSafeArea(.all)
-                        .onTapGesture {
-                            showCustomRenameAlert = false
-                            customRenameText = ""
-                        }
-                    
-                    VStack(spacing: 16) {
-                        Text("Rename Custom")
-                            .font(.headline)
-                            .fontWeight(.bold)
-                            .foregroundColor(.primary)
-                        
-                        TextField("Enter name", text: $customRenameText)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                            .padding(.horizontal)
-                        
-                        HStack(spacing: 20) {
-                            Button("Cancel") {
-                                showCustomRenameAlert = false
-                                customRenameText = ""
-                            }
-                            .foregroundColor(.red)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 8)
-                            .background(Color.red.opacity(0.1))
-                            .cornerRadius(8)
-                            
-                            Button("Save") {
-                                print("💾 Saving custom name: \(customRenameText) for slot \(customToRename)")
-                                saveCustomName(customToRename, name: customRenameText)
-                                showCustomRenameAlert = false
-                                customRenameText = ""
-                            }
+                VStack(spacing: isSmallDevice ? 10 : 15) {
+                    // Title and description
+                    VStack(spacing: 6) {
+                        Text("CoBrush")
+                            .font(.system(size: isSmallDevice ? 22 : 26, weight: .bold))
                             .foregroundColor(.white)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 8)
-                            .background(
-                                customRenameText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?
-                                Color.gray : Color.blue
-                            )
-                            .cornerRadius(8)
-                            .disabled(customRenameText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        }
-                        .padding(.top, 10)
-                    }
-                    .padding(.vertical, 24)
-                    .padding(.horizontal, 20)
-                    .frame(width: 300)
-                    .background(Color(UIColor.systemBackground))
-                    .cornerRadius(12)
-                    .shadow(radius: 20)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                    )
-                }
-                
-                // Centered Save Confirmation Popup Overlay (OLD STYLE)
-                if showSaveConfirmation {
-                    Color.black.opacity(0.4)
-                        .edgesIgnoringSafeArea(.all)
-                        .onTapGesture {
-                            showSaveConfirmation = false
-                        }
-                    
-                    VStack(spacing: 16) {
-                        Text("Save Custom")
-                            .font(.headline)
-                            .fontWeight(.bold)
-                            .foregroundColor(.primary)
                         
-                        Text("Overwrite existing custom '\(getCustomNameForSlot(customToSave))'?")
+                        Text("Set up your CoBrush controller to match your drawing style.")
+                            .font(.system(size: isSmallDevice ? 12 : 14))
+                            .foregroundColor(Color.white.opacity(0.8))
                             .multilineTextAlignment(.center)
-                            .foregroundColor(.secondary)
-                            .padding(.horizontal)
-                        
-                        HStack(spacing: 20) {
-                            Button("Cancel") {
-                                showSaveConfirmation = false
+                            .padding(.horizontal, isSmallDevice ? 20 : 40)
+                    }
+                    .padding(.top, isSmallDevice ? 10 : 20)
+                    
+                    // Buttons for onboarding and tutorial
+                    HStack(spacing: 12) {
+                        Button(action: {
+                            showOnboarding = true
+                        }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "questionmark.circle")
+                                Text("How CoBrush works")
                             }
-                            .foregroundColor(.red)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 8)
-                            .background(Color.red.opacity(0.1))
-                            .cornerRadius(8)
-                            
-                            Button("Confirm") {
-                                saveCustom(slot: customToSave)
-                                showSaveConfirmation = false
-                                
-                                // Show a quick success message
-                                savedCustomName = getCustomNameForSlot(customToSave)
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                    // You could add a toast notification here if desired
-                                }
-                            }
+                            .font(.system(size: 12, weight: .medium))
                             .foregroundColor(.white)
-                            .padding(.horizontal, 20)
+                            .padding(.horizontal, 12)
                             .padding(.vertical, 8)
-                            .background(Color.blue)
+                            .background(Color.white.opacity(0.1))
                             .cornerRadius(8)
                         }
-                        .padding(.top, 10)
+                        
+                        Button(action: {
+                            showInteractiveTutorial = true
+                        }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "hand.draw")
+                                Text("Interactive guide")
+                            }
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Color.white.opacity(0.1))
+                            .cornerRadius(8)
+                        }
                     }
-                    .padding(.vertical, 24)
-                    .padding(.horizontal, 20)
-                    .frame(width: 300)
-                    .background(Color(UIColor.systemBackground))
-                    .cornerRadius(12)
-                    .shadow(radius: 20)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                    )
-                }
-            }
-        }
-    }
-    
-    private var mainNavigationView: some View {
-        NavigationStack {
-            mainContentView
-                .toolbar {
-                    toolbarContent
-                }
-                .toolbarBackground(Color(red: 0.4, green: 0.2, blue: 0.6), for: .navigationBar)
-                .toolbarBackground(.visible, for: .navigationBar)
-                .toolbarColorScheme(.dark, for: .navigationBar)
-        }
-        .onReceive(bleManager.$isConnected) { connected in
-            if connected {
-                showDeviceSheet = false
-            }
-        }
-        .onReceive(bleManager.$currentConfig) { newConfig in
-            print("📥 Loading configuration from device: \(newConfig)")
-            self.config = newConfig
-        }
-    }
-    
-    private var mainContentView: some View {
-        ZStack {
-            // Background color - ADJUSTED LIGHT PURPLE (LESS SATURATED)
-            Color(red: 0.97, green: 0.94, blue: 1.0) // LIGHTER, LESS SATURATED PURPLE
-                .ignoresSafeArea()
-            
-            // REMOVED ScrollView - replaced with fixed VStack
-            VStack(spacing: 20) {
-                // Simulator warning
-                #if targetEnvironment(simulator)
-                VStack(spacing: 12) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 40))
-                        .foregroundColor(.orange)
-                    Text("Simulator Limitation")
-                        .font(.headline)
-                        .foregroundColor(.orange)
-                    Text("Bluetooth is not supported in the iOS Simulator. Please build and run this app on a real iPad or iPhone to test Bluetooth functionality.")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-                }
-                .padding()
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.orange.opacity(0.1))
-                )
-                .padding(.horizontal)
-                #endif
-                
-                // Controller Diagram Section
-                VStack(spacing: 20) {
-                    Text("Controller Configuration")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.black) // BLACK TEXT
-                        .offset(y: 275) // MOVED DOWN BY 250
                     
+                    // Main controller UI
                     ZStack {
-                        // Controller outline first (bottom layer) - SCALED BY 1.5x AND MOVED UP BY 100
-                        controllerOutline
-                            .scaleEffect(controllerScale, anchor: .top) // Scale from top
-                            .offset(y: 150) // MOVED DOWN BY 250 (-100 + 250 = 150)
+                        // Background rounded rectangle behind controllers
+                        RoundedRectangle(cornerRadius: 25)
+                            .fill(Color.black.opacity(0.35))
+                            .frame(width: geometry.size.width * (isSmallDevice ? 0.95 : 0.98),
+                                   height: isSmallDevice ? 260 : 280)
+                            .shadow(radius: 10)
                         
-                        connectionLines
-                            .offset(x: 0, y: 255)
-                        
-                        // Buttons and labels on top of everything
-                        VStack(spacing: 30) {
-                            // Top: Scroll - Button 1 - Button 2 (REORDERED) - MOVED UP BY 60
-                            HStack(spacing: 10) {
-                                // Scroll - Pill/Capsule shape WITH UP/DOWN ARROWS - REVERSED COLORS - RESTORE ORIGINAL SIZE
-                                VStack(spacing: 8) {
-                                    // INCREASED SIZE OF CURRENT CONFIG DISPLAY WITH WIDER WIDTH - NOW CLICKABLE - REVERSED COLORS
-                                    Button(action: {
-                                        showScrollDropdown = true
-                                    }) {
-                                        Text(getCurrentSelection(for: "scroll"))
-                                            .font(.system(size: 16, weight: .medium))
-                                            .foregroundColor(.white) // WHITE TEXT
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 6)
-                                            .background(Color(red: 0.7, green: 0.5, blue: 0.9).opacity(0.8)) // PASTEL PURPLE BACKGROUND
-                                            .cornerRadius(6)
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 6)
-                                                    .stroke(Color.white, lineWidth: 1) // WHITE BORDER
+                        HStack(alignment: .center, spacing: isSmallDevice ? 70 : 120) {
+                            // LEFT CONTROLLER
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 30 * controllerScale)
+                                    .fill(LinearGradient(
+                                        gradient: Gradient(colors: [
+                                            Color(hue: 0.6, saturation: 0.4, brightness: 0.3),
+                                            Color(hue: 0.6, saturation: 0.4, brightness: 0.2)
+                                        ]),
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    ))
+                                    .frame(width: 90 * controllerScale, height: 180 * controllerScale)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 30 * controllerScale)
+                                            .stroke(Color.white.opacity(0.1), lineWidth: 2)
+                                    )
+                                    .shadow(color: Color.black.opacity(0.6), radius: 10, x: 0, y: 6)
+                                
+                                // Side grip texture
+                                RoundedRectangle(cornerRadius: 30 * controllerScale)
+                                    .strokeBorder(
+                                        LinearGradient(
+                                            gradient: Gradient(colors: [Color.white.opacity(0.3), Color.white.opacity(0.1)]),
+                                            startPoint: .top,
+                                            endPoint: .bottom
+                                        ),
+                                        lineWidth: 1
+                                    )
+                                    .frame(width: 88 * controllerScale, height: 178 * controllerScale)
+                                
+                                VStack(spacing: isSmallDevice ? 18 : 22) {
+                                    // TOP BUTTON (Button 1)
+                                    ZStack {
+                                        Circle()
+                                            .fill(
+                                                LinearGradient(
+                                                    gradient: Gradient(colors: [
+                                                        Color(red: 0.93, green: 0.93, blue: 0.96),
+                                                        Color(red: 0.85, green: 0.85, blue: 0.90)
+                                                    ]),
+                                                    startPoint: .topLeft,
+                                                    endPoint: .bottomRight
+                                                )
                                             )
-                                            .fixedSize(horizontal: false, vertical: true)
-                                            .frame(maxWidth: 180)
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
-                                    
-                                    Button(action: {
-                                        showScrollDropdown = true
-                                    }) {
-                                        ZStack {
-                                            // Main pill-shaped body - PASTEL PURPLE FILL - SCALED BY 1.5x (RESTORE ORIGINAL SIZE)
-                                            Capsule()
-                                                .fill(Color(red: 0.7, green: 0.5, blue: 0.9).opacity(0.8)) // PASTEL PURPLE FILL
-                                                .frame(width: 60 * buttonScale, height: 100 * buttonScale) // SCALED BY 1.5x
+                                            .frame(width: 42 * buttonScale, height: 42 * buttonScale)
+                                            .shadow(color: Color.black.opacity(0.4), radius: 4, x: 0, y: 3)
+                                        
+                                        Circle()
+                                            .stroke(Color.black.opacity(0.12), lineWidth: 1)
+                                            .frame(width: 42 * buttonScale, height: 42 * buttonScale)
+                                        
+                                        VStack(spacing: 2) {
+                                            Image(systemName: iconForButton(configKey: "button1"))
+                                                .font(.system(size: 16, weight: .semibold))
+                                                .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                                             
-                                            // Outer border - WHITE OUTLINE
-                                            Capsule()
-                                                .stroke(Color.white, lineWidth: 2)
-                                                .frame(width: 60 * buttonScale, height: 100 * buttonScale) // SCALED BY 1.5x
-                                            
-                                            // UP/DOWN ARROWS ADDED - WHITE - SCALED
-                                            VStack(spacing: 4) {
-                                                Image(systemName: "chevron.up")
-                                                    .font(.system(size: 16 * buttonScale, weight: .bold)) // SCALED
-                                                    .foregroundColor(.white) // WHITE
-                                                
-                                                Image(systemName: "chevron.down")
-                                                    .font(.system(size: 16 * buttonScale, weight: .bold)) // SCALED
-                                                    .foregroundColor(.white) // WHITE
-                                            }
+                                            Text(labelForButton(configKey: "button1"))
+                                                .font(.system(size: 11, weight: .medium))
+                                                .foregroundColor(Color(red: 0.25, green: 0.25, blue: 0.3))
                                         }
                                     }
-                                    .buttonStyle(PlainButtonStyle())
-                                    .background(GeometryReader { geo in
-                                        Color.clear.preference(key: ScrollFrameKey.self, value: geo.frame(in: .global))
-                                    })
-                                    .onPreferenceChange(ScrollFrameKey.self) { frame in
-                                        scrollFrame = frame
+                                    .overlay(
+                                        GeometryReader { proxy in
+                                            Color.clear
+                                                .onAppear {
+                                                    button1Frame = proxy.frame(in: .global)
+                                                }
+                                        }
+                                    )
+                                    
+                                    // MIDDLE BUTTON (Button 2)
+                                    ZStack {
+                                        Circle()
+                                            .fill(
+                                                LinearGradient(
+                                                    gradient: Gradient(colors: [
+                                                        Color(red: 0.93, green: 0.93, blue: 0.96),
+                                                        Color(red: 0.85, green: 0.85, blue: 0.90)
+                                                    ]),
+                                                    startPoint: .top,
+                                                    endPoint: .bottom
+                                                )
+                                            )
+                                            .frame(width: 42 * buttonScale, height: 42 * buttonScale)
+                                            .shadow(color: Color.black.opacity(0.4), radius: 4, x: 0, y: 3)
+                                        
+                                        Circle()
+                                            .stroke(Color.black.opacity(0.12), lineWidth: 1)
+                                            .frame(width: 42 * buttonScale, height: 42 * buttonScale)
+                                        
+                                        VStack(spacing: 2) {
+                                            Image(systemName: iconForButton(configKey: "button2"))
+                                                .font(.system(size: 16, weight: .semibold))
+                                                .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+                                            
+                                            Text(labelForButton(configKey: "button2"))
+                                                .font(.system(size: 11, weight: .medium))
+                                                .foregroundColor(Color(red: 0.25, green: 0.25, blue: 0.3))
+                                        }
+                                    }
+                                    .overlay(
+                                        GeometryReader { proxy in
+                                            Color.clear
+                                                .onAppear {
+                                                    button2Frame = proxy.frame(in: .global)
+                                                }
+                                        }
+                                    )
+                                    
+                                    // BOTTOM SPACER
+                                    Spacer().frame(height: isSmallDevice ? 14 : 18)
+                                }
+                                .padding(.top, isSmallDevice ? 16 : 18)
+                            }
+                            
+                            // RIGHT CONTROLLER
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 30 * controllerScale)
+                                    .fill(LinearGradient(
+                                        gradient: Gradient(colors: [
+                                            Color(hue: 0.6, saturation: 0.4, brightness: 0.3),
+                                            Color(hue: 0.6, saturation: 0.4, brightness: 0.2)
+                                        ]),
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    ))
+                                    .frame(width: 90 * controllerScale, height: 180 * controllerScale)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 30 * controllerScale)
+                                            .stroke(Color.white.opacity(0.1), lineWidth: 2)
+                                    )
+                                    .shadow(color: Color.black.opacity(0.6), radius: 10, x: 0, y: 6)
+                                
+                                RoundedRectangle(cornerRadius: 30 * controllerScale)
+                                    .strokeBorder(
+                                        LinearGradient(
+                                            gradient: Gradient(colors: [Color.white.opacity(0.3), Color.white.opacity(0.1)]),
+                                            startPoint: .top,
+                                            endPoint: .bottom
+                                        ),
+                                        lineWidth: 1
+                                    )
+                                    .frame(width: 88 * controllerScale, height: 178 * controllerScale)
+                                
+                                VStack(spacing: isSmallDevice ? 10 : 12) {
+                                    // TOP SCROLL WHEEL
+                                    ZStack {
+                                        Capsule()
+                                            .fill(
+                                                LinearGradient(
+                                                    gradient: Gradient(colors: [
+                                                        Color(red: 0.9, green: 0.9, blue: 0.95),
+                                                        Color(red: 0.8, green: 0.8, blue: 0.9)
+                                                    ]),
+                                                    startPoint: .top,
+                                                    endPoint: .bottom
+                                                )
+                                            )
+                                            .frame(width: 40 * buttonScale, height: 68 * buttonScale)
+                                            .shadow(color: Color.black.opacity(0.4), radius: 4, x: 0, y: 3)
+                                        
+                                        Capsule()
+                                            .stroke(Color.black.opacity(0.15), lineWidth: 1)
+                                            .frame(width: 40 * buttonScale, height: 68 * buttonScale)
+                                        
+                                        VStack(spacing: 8) {
+                                            // Top arrow
+                                            Image(systemName: "chevron.up")
+                                                .font(.system(size: 12, weight: .bold))
+                                                .foregroundColor(Color(red: 0.25, green: 0.25, blue: 0.3))
+                                            
+                                            // SCROLL GROOVE with textured ridges
+                                            ZStack {
+                                                RoundedRectangle(cornerRadius: 6)
+                                                    .fill(
+                                                        LinearGradient(
+                                                            gradient: Gradient(colors: [
+                                                                Color(red: 0.7, green: 0.7, blue: 0.75),
+                                                                Color(red: 0.55, green: 0.55, blue: 0.6)
+                                                            ]),
+                                                            startPoint: .top,
+                                                            endPoint: .bottom
+                                                        )
+                                                    )
+                                                    .frame(width: 24, height: 18)
+                                                    .shadow(color: Color.black.opacity(0.2), radius: 1, x: 0, y: 1)
+                                                
+                                                VStack(spacing: 1.5) {
+                                                    ForEach(0..<5, id: \.self) { _ in
+                                                        Capsule()
+                                                            .fill(Color.white.opacity(0.7))
+                                                            .frame(width: 18, height: 1)
+                                                    }
+                                                }
+                                            }
+                                            
+                                            Image(systemName: "chevron.down")
+                                                .font(.system(size: 12, weight: .bold))
+                                                .foregroundColor(Color(red: 0.25, green: 0.25, blue: 0.3))
+                                        }
+                                    }
+                                    .overlay(
+                                        GeometryReader { proxy in
+                                            Color.clear
+                                                .onAppear {
+                                                    scrollFrame = proxy.frame(in: .global)
+                                                }
+                                        }
+                                    )
+                                    
+                                    // Middle empty space
+                                    Spacer().frame(height: isSmallDevice ? 12 : 14)
+                                    
+                                    // BOTTOM BUTTONS 1+2 Combo
+                                    ZStack {
+                                        RoundedRectangle(cornerRadius: 18)
+                                            .fill(
+                                                LinearGradient(
+                                                    gradient: Gradient(colors: [
+                                                        Color(red: 0.93, green: 0.93, blue: 0.96),
+                                                        Color(red: 0.85, green: 0.85, blue: 0.9)
+                                                    ]),
+                                                    startPoint: .top,
+                                                    endPoint: .bottom
+                                                )
+                                            )
+                                            .frame(width: 66 * buttonScale, height: 32 * buttonScale)
+                                            .shadow(color: Color.black.opacity(0.4), radius: 4, x: 0, y: 3)
+                                        
+                                        RoundedRectangle(cornerRadius: 18)
+                                            .stroke(Color.black.opacity(0.12), lineWidth: 1)
+                                            .frame(width: 66 * buttonScale, height: 32 * buttonScale)
+                                        
+                                        HStack(spacing: 6) {
+                                            Image(systemName: iconForButton(configKey: "combo"))
+                                                .font(.system(size: 14, weight: .semibold))
+                                                .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+                                            
+                                            Text(labelForButton(configKey: "combo"))
+                                                .font(.system(size: 11, weight: .medium))
+                                                .foregroundColor(Color(red: 0.25, green: 0.25, blue: 0.3))
+                                        }
+                                    }
+                                    .overlay(
+                                        GeometryReader { proxy in
+                                            Color.clear
+                                                .onAppear {
+                                                    comboFrame = proxy.frame(in: .global)
+                                                }
+                                        }
+                                    )
+                                }
+                                .padding(.top, isSmallDevice ? 16 : 18)
+                            }
+                        }
+                    }
+                    .padding(.top, isSmallDevice ? 8 : 12)
+                    
+                    // Configuration controls section
+                    VStack(spacing: isSmallDevice ? 12 : 16) {
+                        // STATUS/HELP AREA
+                        if !bleManager.statusMessage.isEmpty {
+                            StatusNotificationView(statusMessage: bleManager.statusMessage)
+                        }
+                        
+                        if bleManager.detectedProblem != nil {
+                            ProblemNotificationView(problem: bleManager.detectedProblem)
+                        }
+                        
+                        // CONFIG ROWS
+                        VStack(spacing: 10) {
+                            // TOP ROW: Scroll and Click on Scroll
+                            HStack(alignment: .top, spacing: 16) {
+                                // Scroll Wheel config
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text("Scroll wheel")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(.white)
+                                    
+                                    Text("Change brush size with scroll up/down.")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(Color.white.opacity(0.8))
+                                        .fixedSize(horizontal: false, vertical: true)
+                                    
+                                    HStack(spacing: 10) {
+                                        VStack(spacing: 8) {
+                                            Button(action: {
+                                                showScrollDropdown = true
+                                            }) {
+                                                Text(getCurrentSelection(for: "scroll"))
+                                                    .font(.system(size: 16, weight: .medium))
+                                                    .foregroundColor(.white) // WHITE TEXT
+                                                    .padding(.horizontal, 12)
+                                                    .padding(.vertical, 6)
+                                                    .background(Color(red: 0.7, green: 0.5, blue: 0.9).opacity(0.8)) // PASTEL PURPLE BACKGROUND
+                                                    .cornerRadius(6)
+                                            }
+                                            .buttonStyle(PlainButtonStyle())
+                                            
+                                            Text("Scroll up/down to adjust brush size.")
+                                                .font(.system(size: 11))
+                                                .foregroundColor(Color.white.opacity(0.7))
+                                                .fixedSize(horizontal: false, vertical: true)
+                                        }
+                                        .popover(isPresented: $showScrollDropdown,
+                                                 attachmentAnchor: .point(.bottom),
+                                                 arrowEdge: .top) {
+                                            VStack(spacing: 0) {
+                                                ForEach(scrollOptions, id: \.self) { option in
+                                                    Button(action: {
+                                                        config["scroll"] = optionToCode(option)
+                                                        saveConfigurationIfConnected()
+                                                        showScrollDropdown = false
+                                                    }) {
+                                                        Text(option)
+                                                            .foregroundColor(.primary)
+                                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                                            .padding(.horizontal, 16)
+                                                            .padding(.vertical, 12)
+                                                    }
+                                                    if option != scrollOptions.last {
+                                                        Divider()
+                                                    }
+                                                }
+                                            }
+                                            .padding(.vertical, 8)
+                                            .background(Color.white)
+                                            .cornerRadius(12)
+                                            .shadow(radius: 5)
+                                            .frame(width: 220)
+                                        }
+                                        
+                                        Spacer()
+                                    }
+                                }
+                                
+                                // Click on Scroll config
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text("Click on Scroll")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(.white)
+                                    
+                                    Text("Press down on the scroll wheel to trigger a shortcut.")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(Color.white.opacity(0.8))
+                                        .fixedSize(horizontal: false, vertical: true)
+                                    
+                                    HStack(spacing: 10) {
+                                        // Config display for the click scroll button
+                                        Button(action: {
+                                            showClickScrollDropdown = true
+                                        }) {
+                                            Text(getCurrentSelection(for: "button3"))
+                                                .font(.system(size: 10, weight: .medium))
+                                                .foregroundColor(.white) // WHITE TEXT
+                                                .padding(.horizontal, 6)
+                                                .padding(.vertical, 3)
+                                                .background(Color(red: 0.7, green: 0.5, blue: 0.9).opacity(0.8)) // PASTEL PURPLE BACKGROUND
+                                                .cornerRadius(4)
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: 4)
+                                                        .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), lineWidth: 2) // DARK PURPLE OUTLINE
+                                                )
+                                                .fixedSize(horizontal: false, vertical: true)
+                                                .frame(maxWidth: 120)
+                                        }
+                                        .buttonStyle(PlainButtonStyle())
+                                        
+                                        // Click scroll button with finger-clicking symbol
+                                        Button(action: {
+                                            showClickScrollDropdown = true
+                                        }) {
+                                            ZStack {
+                                                // Main pill-shaped body - PASTEL PURPLE FILL
+                                                Capsule()
+                                                    .fill(Color(red: 0.7, green: 0.5, blue: 0.9).opacity(0.8)) // PASTEL PURPLE FILL
+                                                    .frame(width: 36, height: 60) // Smaller size
+                                                
+                                                // Outer border
+                                                Capsule()
+                                                    .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), lineWidth: 2)
+                                                    .frame(width: 36, height: 60)
+                                                
+                                                // FINGER-CLICKING SYMBOL
+                                                VStack(spacing: 2) {
+                                                    Image(systemName: "hand.tap.fill")
+                                                        .font(.system(size: 12, weight: .bold))
+                                                        .foregroundColor(.white) // WHITE
+                                                        .padding(.top, 4)
+                                                    
+                                                    Circle()
+                                                        .fill(Color.white.opacity(0.3))
+                                                        .frame(width: 8, height: 8)
+                                                        .offset(y: 2)
+                                                }
+                                            }
+                                        }
+                                        .buttonStyle(PlainButtonStyle())
                                     }
                                     
-                                    // Make the label clickable - PASTEL PURPLE TEXT - MOVED DOWN
+                                    // Make the label clickable
                                     Button(action: {
-                                        showScrollDropdown = true
+                                        showClickScrollDropdown = true
                                     }) {
-                                        Text("Scroll")
-                                            .font(.system(size: 16, weight: .semibold))
+                                        Text("Click on Scroll")
+                                            .font(.system(size: 12, weight: .semibold))
                                             .foregroundColor(Color(red: 0.7, green: 0.5, blue: 0.9)) // PASTEL PURPLE TEXT
                                     }
                                     .buttonStyle(PlainButtonStyle())
-                                    .padding(.top, 10) // MOVED DOWN BY 10 POINTS
                                 }
-                                .offset(x: -100, y: 205)
-                                .popover(isPresented: $showScrollDropdown, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
+                                .popover(isPresented: $showClickScrollDropdown, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
                                     VStack(spacing: 0) {
-                                        ForEach(scrollOptions, id: \.self) { option in
+                                        ForEach(allButtonOptions, id: \.self) { option in
                                             Button(action: {
-                                                config["scroll"] = optionToCode(option)
+                                                config["button3"] = optionToCode(option)
                                                 saveConfigurationIfConnected()
-                                                showScrollDropdown = false
+                                                showClickScrollDropdown = false
                                             }) {
                                                 Text(option)
                                                     .foregroundColor(.primary)
@@ -501,7 +803,7 @@ struct ContentView: View {
                                                     .padding(.horizontal, 16)
                                                     .padding(.vertical, 12)
                                             }
-                                            if option != scrollOptions.last {
+                                            if option != allButtonOptions.last {
                                                 Divider()
                                             }
                                         }
@@ -512,68 +814,84 @@ struct ContentView: View {
                                     .shadow(radius: 5)
                                     .frame(width: 200)
                                 }
+                            }
+                            .frame(height: 200) // Give it some height
+                            
+                            VStack(spacing: 8) {
+                                Button(action: {
+                                    showComboDropdown = true
+                                }) {
+                                    Text(getCurrentSelection(for: "combo"))
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(Color(red: 0.7, green: 0.5, blue: 0.9).opacity(0.8))
+                                        .cornerRadius(6)
+                                }
+                                .buttonStyle(PlainButtonStyle())
                                 
-                                // Button 1 - Larger - MOVED BACK TO ORIGINAL POSITION - PASTEL RED-PURPLE REVERSED COLORS
-                                VStack(spacing: 8) {
-                                    // INCREASED SIZE OF CURRENT CONFIG DISPLAY - NOW CLICKABLE - REVERSED COLORS
-                                    Button(action: {
-                                        showButton1Dropdown = true
-                                    }) {
-                                        Text(getCurrentSelection(for: "button1"))
-                                            .font(.system(size: 16, weight: .medium))
-                                            .foregroundColor(.white) // WHITE TEXT
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 6)
-                                            .background(Color(red: 0.85, green: 0.4, blue: 0.7).opacity(0.8)) // PASTEL RED-PURPLE BACKGROUND
-                                            .cornerRadius(6)
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 6)
-                                                    .stroke(Color.white, lineWidth: 1) // WHITE BORDER
-                                            )
-                                            .fixedSize(horizontal: false, vertical: true)
-                                            .frame(maxWidth: 120)
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
-                                    
-                                    // Make the button name clickable - REVERSED COLORS - SCALED BY 1.5x
-                                    Button(action: {
-                                        showButton1Dropdown = true
-                                    }) {
-                                        ZStack {
-                                            Circle()
-                                                .fill(Color(red: 0.85, green: 0.4, blue: 0.7).opacity(0.8)) // PASTEL RED-PURPLE BACKGROUND
-                                                .frame(width: 80 * buttonScale, height: 80 * buttonScale) // SCALED BY 1.5x
-                                            
-                                            Circle()
-                                                .stroke(Color.white, lineWidth: 2) // WHITE BORDER
-                                                .frame(width: 80 * buttonScale, height: 80 * buttonScale) // SCALED BY 1.5x
-                                            
-                                            Text("1")
-                                                .font(.system(size: 24 * buttonScale, weight: .bold)) // SCALED
-                                                .foregroundColor(.white) // WHITE TEXT
+                                Text("Press both buttons together for a secondary shortcut.")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(Color.white.opacity(0.7))
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            .popover(isPresented: $showButtons12Dropdown,
+                                     attachmentAnchor: .point(.bottom),
+                                     arrowEdge: .top) {
+                                VStack(spacing: 0) {
+                                    ForEach(buttons12Options, id: \.self) { option in
+                                        Button(action: {
+                                            config["combo"] = optionToCode(option)
+                                            saveConfigurationIfConnected()
+                                            showButtons12Dropdown = false
+                                        }) {
+                                            Text(option)
+                                                .foregroundColor(.primary)
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                                .padding(.horizontal, 16)
+                                                .padding(.vertical, 12)
+                                        }
+                                        if option != buttons12Options.last {
+                                            Divider()
                                         }
                                     }
-                                    .buttonStyle(PlainButtonStyle())
-                                    .background(GeometryReader { geo in
-                                        Color.clear.preference(key: ViewFrameKey.self, value: geo.frame(in: .global))
-                                    })
-                                    .onPreferenceChange(ViewFrameKey.self) { frame in
-                                        button1Frame = frame
-                                    }
-                                    
-                                    // Make the label clickable - PASTEL RED-PURPLE TEXT - MOVED DOWN
-                                    Button(action: {
-                                        showButton1Dropdown = true
-                                    }) {
-                                        Text("Button 1")
-                                            .font(.system(size: 16, weight: .semibold))
-                                            .foregroundColor(Color(red: 0.85, green: 0.4, blue: 0.7)) // PASTEL RED-PURPLE TEXT
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
-                                    .padding(.top, 10) // MOVED DOWN BY 10 POINTS
                                 }
-                                .offset(y: 205) // MOVED DOWN BY 250 (-45 + 250 = 205)
-                                .popover(isPresented: $showButton1Dropdown, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
+                                .padding(.vertical, 8)
+                                .background(Color.white)
+                                .cornerRadius(12)
+                                .shadow(radius: 5)
+                                .frame(width: 220)
+                            }
+                        }
+                        
+                        // BOTTOM ROW: Buttons 1 and 2
+                        HStack(alignment: .top, spacing: 16) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Button 1 (top)")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(.white)
+                                
+                                Text("Assign undo, erase, or other tools to the top button.")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(Color.white.opacity(0.8))
+                                    .fixedSize(horizontal: false, vertical: true)
+                                
+                                Button(action: {
+                                    showButton1Dropdown = true
+                                }) {
+                                    Text(getCurrentSelection(for: "button1"))
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(Color(red: 0.7, green: 0.5, blue: 0.9).opacity(0.8))
+                                        .cornerRadius(6)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                                .popover(isPresented: $showButton1Dropdown,
+                                         attachmentAnchor: .point(.bottom),
+                                         arrowEdge: .top) {
                                     VStack(spacing: 0) {
                                         ForEach(circleButton1Options, id: \.self) { option in
                                             Button(action: {
@@ -596,70 +914,35 @@ struct ContentView: View {
                                     .background(Color.white)
                                     .cornerRadius(12)
                                     .shadow(radius: 5)
-                                    .frame(width: 150)
+                                    .frame(width: 220)
                                 }
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Button 2 (middle)")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(.white)
                                 
-                                // Button 2 - Larger - MOVED BACK TO ORIGINAL POSITION - PASTEL BLUE-PURPLE REVERSED COLORS
-                                VStack(spacing: 8) {
-                                    // INCREASED SIZE OF CURRENT CONFIG DISPLAY - NOW CLICKABLE - REVERSED COLORS
-                                    Button(action: {
-                                        showButton2Dropdown = true
-                                    }) {
-                                        Text(getCurrentSelection(for: "button2"))
-                                            .font(.system(size: 16, weight: .medium))
-                                            .foregroundColor(.white) // WHITE TEXT
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 6)
-                                            .background(Color(red: 0.5, green: 0.4, blue: 0.9).opacity(0.8)) // PASTEL BLUE-PURPLE BACKGROUND
-                                            .cornerRadius(6)
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 6)
-                                                    .stroke(Color.white, lineWidth: 1) // WHITE BORDER
-                                            )
-                                            .fixedSize(horizontal: false, vertical: true)
-                                            .frame(maxWidth: 120)
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
-                                    
-                                    // Make the button name clickable - REVERSED COLORS - SCALED BY 1.5x
-                                    Button(action: {
-                                        showButton2Dropdown = true
-                                    }) {
-                                        ZStack {
-                                            Circle()
-                                                .fill(Color(red: 0.5, green: 0.4, blue: 0.9).opacity(0.8)) // PASTEL BLUE-PURPLE BACKGROUND
-                                                .frame(width: 80 * buttonScale, height: 80 * buttonScale) // SCALED BY 1.5x
-                                            
-                                            Circle()
-                                                .stroke(Color.white, lineWidth: 2) // WHITE BORDER
-                                                .frame(width: 80 * buttonScale, height: 80 * buttonScale) // SCALED BY 1.5x
-                                            
-                                            Text("2")
-                                                .font(.system(size: 24 * buttonScale, weight: .bold)) // SCALED
-                                                .foregroundColor(.white) // WHITE TEXT
-                                        }
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
-                                    .background(GeometryReader { geo in
-                                        Color.clear.preference(key: Button2FrameKey.self, value: geo.frame(in: .global))
-                                    })
-                                    .onPreferenceChange(Button2FrameKey.self) { frame in
-                                        button2Frame = frame
-                                    }
-                                    
-                                    // Make the label clickable - PASTEL BLUE-PURPLE TEXT - MOVED DOWN
-                                    Button(action: {
-                                        showButton2Dropdown = true
-                                    }) {
-                                        Text("Button 2")
-                                            .font(.system(size: 16, weight: .semibold))
-                                            .foregroundColor(Color(red: 0.5, green: 0.4, blue: 0.9)) // PASTEL BLUE-PURPLE TEXT
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
-                                    .padding(.top, 10) // MOVED DOWN BY 10 POINTS
+                                Text("Set up erase or other options for the middle button.")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(Color.white.opacity(0.8))
+                                    .fixedSize(horizontal: false, vertical: true)
+                                
+                                Button(action: {
+                                    showButton2Dropdown = true
+                                }) {
+                                    Text(getCurrentSelection(for: "button2"))
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(Color(red: 0.7, green: 0.5, blue: 0.9).opacity(0.8))
+                                        .cornerRadius(6)
                                 }
-                                .offset(x: 100, y: 205)
-                                .popover(isPresented: $showButton2Dropdown, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
+                                .buttonStyle(PlainButtonStyle())
+                                .popover(isPresented: $showButton2Dropdown,
+                                         attachmentAnchor: .point(.bottom),
+                                         arrowEdge: .top) {
                                     VStack(spacing: 0) {
                                         ForEach(circleButton2Options, id: \.self) { option in
                                             Button(action: {
@@ -682,541 +965,172 @@ struct ContentView: View {
                                     .background(Color.white)
                                     .cornerRadius(12)
                                     .shadow(radius: 5)
-                                    .frame(width: 150)
-                                }
-                            }
-                            .padding(.top, 20)
-                        }
-                        .frame(height: 320 * controllerScale) // SCALED HEIGHT
-                    }
-                }
-                .padding(.top, 15)
-                .padding(.horizontal)
-                
-                // VERTICAL ARROW
-                VStack(spacing: 0) {
-                    // VERTICAL ARROW POINTING UP - HALVED LENGTH
-                    GeometryReader { geometry in
-                        ZStack {
-                            // Calculate position for the vertical arrow (centered above click scroll button)
-                            let clickScrollCenterX = geometry.size.width / 2 - 230 // Same X as click scroll
-                            let clickScrollTopY = (geometry.size.height / 2) - (100 * buttonScale * 0.3) + 15 // Position of click scroll minus height
-                            
-                            // Position arrow 20 points above click scroll button, then MOVED DOWN BY 300
-                            let arrowY = clickScrollTopY - 60 + 120 //
-                            
-                            // Vertical arrow line (halved length) pointing UP
-                            Path { path in
-                                let arrowLength: CGFloat = 30
-                                path.move(to: CGPoint(x: clickScrollCenterX, y: arrowY + arrowLength))
-                                path.addLine(to: CGPoint(x: clickScrollCenterX, y: arrowY)) // Pointing UP
-                            }
-                            .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                            
-                            // Arrow head (pointing up)
-                            Path { path in
-                                let arrowSize: CGFloat = 8
-                                path.move(to: CGPoint(x: clickScrollCenterX, y: arrowY))
-                                path.addLine(to: CGPoint(x: clickScrollCenterX - arrowSize, y: arrowY + arrowSize))
-                                path.move(to: CGPoint(x: clickScrollCenterX, y: arrowY))
-                                path.addLine(to: CGPoint(x: clickScrollCenterX + arrowSize, y: arrowY + arrowSize))
-                            }
-                            .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                        }
-                    }
-                    
-                    // CLICK SCROLL BUTTON SECTION - POSITIONED UNDER ARROW
-                    VStack(spacing: 8) {
-                        // Config display for the click scroll button
-                        Button(action: {
-                            showClickScrollDropdown = true
-                        }) {
-                            Text(getCurrentSelection(for: "button3"))
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundColor(.white) // WHITE TEXT
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 3)
-                                .background(Color(red: 0.7, green: 0.5, blue: 0.9).opacity(0.8)) // PASTEL PURPLE BACKGROUND
-                                .cornerRadius(4)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 4)
-                                        .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), lineWidth: 2) // DARK PURPLE OUTLINE
-                                )
-                                .fixedSize(horizontal: false, vertical: true)
-                                .frame(maxWidth: 120)
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        
-                        // Click scroll button with finger-clicking symbol
-                        Button(action: {
-                            showClickScrollDropdown = true
-                        }) {
-                            ZStack {
-                                // Main pill-shaped body - PASTEL PURPLE FILL
-                                Capsule()
-                                    .fill(Color(red: 0.7, green: 0.5, blue: 0.9).opacity(0.8)) // PASTEL PURPLE FILL
-                                    .frame(width: 36, height: 60) // Smaller size
-                                
-                                // Outer border
-                                Capsule()
-                                    .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), lineWidth: 2)
-                                    .frame(width: 36, height: 60)
-                                
-                                // FINGER-CLICKING SYMBOL
-                                VStack(spacing: 2) {
-                                    Image(systemName: "hand.tap.fill")
-                                        .font(.system(size: 12, weight: .bold))
-                                        .foregroundColor(.white) // WHITE
-                                        .padding(.top, 4)
-                                    
-                                    Circle()
-                                        .fill(Color.white.opacity(0.3))
-                                        .frame(width: 8, height: 8)
-                                        .offset(y: 2)
+                                    .frame(width: 220)
                                 }
                             }
                         }
-                        .buttonStyle(PlainButtonStyle())
-                        
-                        // Make the label clickable
-                        Button(action: {
-                            showClickScrollDropdown = true
-                        }) {
-                            Text("Click on Scroll")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(Color(red: 0.7, green: 0.5, blue: 0.9)) // PASTEL PURPLE TEXT
-                        }
-                        .buttonStyle(PlainButtonStyle())
                     }
-                    .offset(x: -230, y: 25) // Position under original scroll button, MOVED DOWN BY 25
-                    .popover(isPresented: $showClickScrollDropdown, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
-                        VStack(spacing: 0) {
-                            ForEach(allButtonOptions, id: \.self) { option in
-                                Button(action: {
-                                    config["button3"] = optionToCode(option)
-                                    saveConfigurationIfConnected()
-                                    showClickScrollDropdown = false
-                                }) {
-                                    Text(option)
-                                        .foregroundColor(.primary)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 12)
-                                }
-                                if option != allButtonOptions.last {
-                                    Divider()
-                                }
-                            }
-                        }
-                        .padding(.vertical, 8)
-                        .background(Color.white)
-                        .cornerRadius(12)
-                        .shadow(radius: 5)
-                        .frame(width: 200)
-                    }
-                }
-                .frame(height: 200) // Give it some height
-                
-                VStack(spacing: 8) {
-                    Button(action: {
-                        showComboDropdown = true
-                    }) {
-                        Text(getCurrentSelection(for: "combo"))
-                            .font(.system(size: 16 * 1.0, weight: .medium)) // ORIGINAL SIZE
-                            .foregroundColor(.white) // WHITE TEXT
-                            .padding(.horizontal, 12 * 1.0) // ORIGINAL PADDING
-                            .padding(.vertical, 6 * 1.0) // ORIGINAL PADDING
-                            .background(Color(red: 0.7, green: 0.5, blue: 0.8)) // PURPLE BACKGROUND
-                            .cornerRadius(6 * 1.0) // ORIGINAL CORNER RADIUS
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6 * 1.0)
-                                    .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), lineWidth: 2) // DARK PURPLE OUTLINE
-                            )
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: 180 * 1.0) // ORIGINAL WIDTH
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    
-                    Button(action: {
-                        showComboDropdown = true
-                    }) {
-                        HStack(spacing: 6) {
-                            // Button 1 - MATCHES ACTUAL BUTTON 1 (PASTEL RED-PURPLE REVERSED SCHEME)
-                            ZStack {
-                                Circle()
-                                    .fill(Color(red: 0.85, green: 0.4, blue: 0.7).opacity(0.8)) // PASTEL RED-PURPLE BACKGROUND
-                                    .frame(width: 28 * 1.0, height: 28 * 1.0) // ORIGINAL SIZE
-                                
-                                Circle()
-                                    .stroke(Color.white, lineWidth: 1) // WHITE BORDER
-                                    .frame(width: 28 * 1.0, height: 28 * 1.0)
-                                
-                                Text("1")
-                                    .font(.system(size: 12 * 1.0, weight: .bold)) // ORIGINAL SIZE
-                                    .foregroundColor(.white) // WHITE TEXT
-                            }
-                            
-                            // Plus sign - WHITE
-                            Text("+")
-                                .font(.system(size: 16 * 1.0, weight: .bold)) // ORIGINAL SIZE
-                                .foregroundColor(.white)
-                            
-                            // Button 2 - MATCHES ACTUAL BUTTON 2 (PASTEL BLUE-PURPLE REVERSED SCHEME)
-                            ZStack {
-                                Circle()
-                                    .fill(Color(red: 0.5, green: 0.4, blue: 0.9).opacity(0.8)) // PASTEL BLUE-PURPLE BACKGROUND
-                                    .frame(width: 28 * 1.0, height: 28 * 1.0)
-                                
-                                Circle()
-                                    .stroke(Color.white, lineWidth: 1) // WHITE BORDER
-                                    .frame(width: 28 * 1.0, height: 28 * 1.0)
-                                
-                                Text("2")
-                                    .font(.system(size: 12 * 1.0, weight: .bold))
-                                    .foregroundColor(.white) // WHITE TEXT
-                            }
-                        }
-                        .padding(.horizontal, 16 * 1.0) // ORIGINAL PADDING
-                        .padding(.vertical, 12 * 1.0) // ORIGINAL PADDING
-                        .background(Color(red: 0.7, green: 0.5, blue: 0.8)) // PURPLE BACKGROUND
-                        .cornerRadius(8 * 1.0) // ORIGINAL CORNER RADIUS
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8 * 1.0)
-                                .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), lineWidth: 2) // DARK PURPLE OUTLINE
-                        )
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .background(GeometryReader { geo in
-                        Color.clear.preference(key: ComboFrameKey.self, value: geo.frame(in: .global))
-                    })
-                    .onPreferenceChange(ComboFrameKey.self) { frame in
-                        comboFrame = frame
-                    }
-                }
-                .offset(x: 145, y: -95)
-                .popover(isPresented: $showComboDropdown, attachmentAnchor: .point(.trailing), arrowEdge: .trailing) {
-                    VStack(spacing: 0) {
-                        ForEach(buttons12Options, id: \.self) { option in
-                            Button(action: {
-                                config["combo"] = optionToCode(option)
-                                saveConfigurationIfConnected()
-                                showComboDropdown = false
-                            }) {
-                                Text(option)
-                                    .foregroundColor(.primary)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 12)
-                            }
-                            if option != buttons12Options.last {
-                                Divider()
-                            }
-                        }
-                    }
-                    .padding(.vertical, 8)
-                    .background(Color.white)
-                    .cornerRadius(12)
-                    .shadow(radius: 5)
-                    .frame(width: 180)
-                    .presentationCompactAdaptation(.popover)
-                }
-                
-                if bleManager.isConnected {
-                    VStack(spacing: 8) {
-                        Image(systemName: "info.circle.fill")
-                            .font(.system(size: 24))
-                            .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
-                        Text("⚠️ While connected, do NOT press the RESET button on the device. It will disconnect and restart.")
-                            .font(.caption)
-                            .multilineTextAlignment(.center)
-                            .foregroundColor(.black)
-                    }
-                    .padding()
-                    .background(RoundedRectangle(cornerRadius: 12).fill(Color(red: 0.4, green: 0.2, blue: 0.6).opacity(0.1)))
                     .padding(.horizontal)
-                    .padding(.top, 30)
-                }
-                
-                // ADDED SPACING BEFORE NOTIFICATION SECTION
-                Spacer().frame(height: 30)
-                
-                // EXTRACTED AND MOVED Status Message Section
-                if !bleManager.statusMessage.isEmpty {
-                    StatusNotificationView(statusMessage: bleManager.statusMessage)
-                        .offset(y: -100) // MOVED UP BY 150
-                }
-                
-                // Save Custom Button - NOW INSIDE THE MAIN VSTACK
-                HStack {
-                    Spacer()
-                    Button(action: {
-                        showSaveCustomDropdown = true
-                    }) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "square.and.arrow.down")
-                                .font(.system(size: 16))
-                                .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6)) // PURPLE ICON
-                            Text("Save as Custom")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6)) // PURPLE TEXT
+                    
+                    // SAVE / RESET / HELP SECTION
+                    VStack(spacing: 10) {
+                        HStack(spacing: 10) {
+                            // Save preset button (RENAMED TO "Save custom")
+                            Button(action: {
+                                showSaveCustomDropdown = true
+                            }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "square.and.arrow.down")
+                                    Text("Save custom")
+                                }
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(Color(red: 0.3, green: 0.2, blue: 0.5))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 8)
+                                .background(Color.white)
+                                .cornerRadius(8)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            
+                            // Load preset button (RENAMED TO "Load custom")
+                            Button(action: {
+                                showCustomsDropdown = true
+                            }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "folder")
+                                    Text("Load custom")
+                                }
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(Color(red: 0.3, green: 0.2, blue: 0.5))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 8)
+                                .background(Color.white)
+                                .cornerRadius(8)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .popover(isPresented: $showCustomsDropdown,
+                                     attachmentAnchor: .point(.bottom),
+                                     arrowEdge: .top) {
+                                customMenuView
+                            }
+                            
+                            Button(action: {
+                                resetToDefault()
+                            }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "arrow.uturn.backward")
+                                    Text("Reset to default")
+                                }
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(Color(red: 0.6, green: 0.1, blue: 0.1))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 8)
+                                .background(Color.white)
+                                .cornerRadius(8)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            
+                            Spacer()
+                            
+                            Button(action: {
+                                showHelpDropdown.toggle()
+                            }) {
+                                Image(systemName: "questionmark.circle")
+                                    .font(.system(size: 16))
+                                    .foregroundColor(.white)
+                                    .padding(8)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .popover(isPresented: $showHelpDropdown,
+                                     attachmentAnchor: .point(.top),
+                                     arrowEdge: .bottom) {
+                                helpMenuView
+                            }
                         }
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 12)
-                        .background(Color.white) // WHITE BACKGROUND
-                        .cornerRadius(10)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), lineWidth: 2) // PURPLE BORDER
-                        )
+                        
+                        // Help bubble guidance
+                        if showHelp {
+                            HelpBubbleView(text: "Tip: Start with Undo on Button 1, Erase on Button 2, Brush Library on Buttons 1+2, and Brush Size ±5% on the scroll wheel.")
+                        }
                     }
-                    .padding(.trailing, 80)
-                    .padding(.bottom, 100)
-                    .offset(y: -300)
-                    .popover(isPresented: $showSaveCustomDropdown, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
-                        saveCustomMenuView
+                    .padding(.horizontal)
+                    .padding(.bottom, 10)
+                }
+                
+                // Overlay: Save custom dropdown
+                if showSaveCustomDropdown {
+                    PopupBackground {
+                        saveCustomDropdownView
                     }
                 }
-                .padding(.top, 20)
                 
-                Spacer()
+                // Overlay: Rename custom alert
+                if showCustomRenameAlert {
+                    PopupBackground {
+                        renameCustomPopup()
+                    }
+                }
+                
+                // Overlay: Save confirmation
+                if showSaveConfirmation {
+                    PopupBackground {
+                        saveConfirmationPopup()
+                    }
+                }
+                
+                // Device sheet (Bluetooth devices, connection)
+                if showDeviceSheet {
+                    VStack {
+                        Spacer()
+                        DeviceSheetView(bleManager: bleManager,
+                                        isPresented: $showDeviceSheet,
+                                        scanButtonFrame: $scanButtonFrame)
+                            .transition(.move(edge: .bottom))
+                    }
+                    .edgesIgnoringSafeArea(.bottom)
+                }
             }
-            .padding(.vertical)
-            .padding(.bottom, 30)
-        }
-        .navigationTitle("eSketch Shortcuts")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-    
-    @ToolbarContentBuilder
-    var toolbarContent: some ToolbarContent {
-        // Left toolbar - Bluetooth Scan/Connect button styled like Customs
-        ToolbarItem(placement: .navigationBarLeading) {
-            HStack(spacing: 10) {
-                // Bluetooth button styled like Customs
-                Button(action: {
+            .onAppear {
+                if !hasShownInitialSheet {
+                    hasShownInitialSheet = true
+                    showOnboarding = !hasCompletedOnboarding
+                }
+            }
+            .onChange(of: scenePhase) { newPhase in
+                switch newPhase {
+                case .background:
+                    print("📱 App going to background, disconnecting...")
                     if bleManager.isConnected {
                         bleManager.disconnect()
-                    } else if !bleManager.isScanning {
-                        bleManager.startScan()
-                        showDeviceSheet = true
                     }
-                }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "dot.radiowaves.left.and.right")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(bleManager.isConnected ? Color.green : Color(red: 0.4, green: 0.2, blue: 0.6))
-                        Text(bleManager.isConnected ? "Connected" : "Scan")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(bleManager.isConnected ? Color.green : Color(red: 0.4, green: 0.2, blue: 0.6))
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color.white.opacity(0.9))
-                    .cornerRadius(8)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(
-                                bleManager.isConnected
-                                ? Color.green.opacity(0.6)
-                                : Color(red: 0.4, green: 0.2, blue: 0.6).opacity(0.6),
-                                lineWidth: 1.5
-                            )
-                    )
-                }
-                .disabled(bleManager.isScanning)
-                .overlay(
-                    GeometryReader { geo in
-                        Color.clear.preference(key: ScanButtonFrameKey.self, value: geo.frame(in: .global))
-                    }
-                )
-                .onPreferenceChange(ScanButtonFrameKey.self) { frame in
-                    scanButtonFrame = frame
+                case .inactive:
+                    print("📱 App inactive")
+                case .active:
+                    print("📱 App active")
+                @unknown default:
+                    break
                 }
             }
-        }
-        
-        // Help button in separate ToolbarItem for proper popover positioning
-        ToolbarItem(placement: .navigationBarLeading) {
-            Button(action: {
-                showHelpDropdown = true
-            }) {
-                Image(systemName: "questionmark.circle")
-                    .foregroundColor(.white)
-                    .font(.system(size: 18))
-            }
-            .popover(isPresented: $showHelpDropdown, arrowEdge: .top) {
-                helpMenuView
-                    .presentationCompactAdaptation(.popover)
-            }
-        }
-        
-        // Right toolbar - Customs button and Reset to Default button
-        ToolbarItemGroup(placement: .navigationBarTrailing) {
-            // Reset to Default Button - SAME HEIGHT AS OTHER BUTTONS
-            Button(action: {
-                resetToDefault()
-            }) {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 16, weight: .medium))
-                    Text("Reset to Default")
-                        .font(.system(size: 15, weight: .semibold))
+            .onChange(of: bleManager.detectedProblem) { problem in
+                if problem != nil {
+                    showHelp = true
                 }
-                .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Color.white.opacity(0.9))
-                .cornerRadius(8)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color(red: 0.4, green: 0.2, blue: 0.6).opacity(0.6), lineWidth: 1.5)
+            }
+            .sheet(isPresented: $showOnboarding) {
+                OnboardingView(showOnboarding: $showOnboarding, hasCompletedOnboarding: $hasCompletedOnboarding)
+            }
+            .sheet(isPresented: $showInteractiveTutorial) {
+                InteractiveTutorialView(
+                    showTutorial: $showInteractiveTutorial,
+                    hasCompletedOnboarding: $hasCompletedOnboarding,
+                    scanButtonFrame: scanButtonFrame,
+                    button1Frame: button1Frame,
+                    button2Frame: button2Frame,
+                    scrollFrame: scrollFrame,
+                    comboFrame: comboFrame
                 )
             }
-            
-            // Customs Menu Button - RENAMED FROM PRESETS
-            Button(action: {
-                showCustomsDropdown = true
-            }) {
-                HStack(spacing: 6) {
-                    Image(systemName: "list.bullet")
-                        .font(.system(size: 16, weight: .medium))
-                    Text("Customs")
-                        .font(.system(size: 15, weight: .semibold))
-                }
-                .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Color.white.opacity(0.9))
-                .cornerRadius(8)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color(red: 0.4, green: 0.2, blue: 0.6).opacity(0.6), lineWidth: 1.5)
-                )
-            }
-            .popover(isPresented: $showCustomsDropdown, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
-                customMenuView
-            }
         }
-    }
-    
-    // MARK: - Save Custom Menu View
-    var saveCustomMenuView: some View {
-        VStack(spacing: 0) {
-            Text("Save Current Configuration")
-                .font(.headline)
-                .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
-                .padding()
-                .frame(maxWidth: .infinity)
-                .background(Color.gray.opacity(0.1))
-            
-            // Always show Custom 1 as the first option - USE ACTUAL CUSTOM NAME
-            Button(action: {
-                customToSave = 1
-                showSaveConfirmation = true
-                showSaveCustomDropdown = false
-            }) {
-                HStack {
-                    // FIX: Use the actual custom name if it exists
-                    if let custom1 = customs.first(where: { $0.id == 1 }) {
-                        Text(custom1.name)
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.black)
-                    } else {
-                        Text("Custom 1")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.black)
-                    }
-                    Spacer()
-                }
-                .padding()
-                .background(Color.white)
-            }
-            
-            Divider()
-            
-            // Show other existing customs - USE ACTUAL CUSTOM NAMES
-            ForEach(customs.filter { $0.id != 1 }) { custom in
-                Button(action: {
-                    customToSave = custom.id
-                    showSaveConfirmation = true
-                    showSaveCustomDropdown = false
-                }) {
-                    HStack {
-                        Text(custom.name)
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.black)
-                        Spacer()
-                    }
-                    .padding()
-                    .background(Color.white)
-                }
-                
-                if custom.id != customs.last?.id {
-                    Divider()
-                }
-            }
-            
-            // Show "Add New Custom" option if we have less than 5 slots
-            if customs.count < 5 {
-                Button(action: {
-                    // Find the first available slot (2-5, since 1 is always shown)
-                    let nextSlot = findFirstAvailableSlot()
-                    customToSave = nextSlot
-                    showSaveConfirmation = true
-                    showSaveCustomDropdown = false
-                }) {
-                    HStack {
-                        Text("Add New Custom")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.green)
-                        Spacer()
-                        Image(systemName: "plus.circle.fill")
-                            .foregroundColor(.green)
-                    }
-                    .padding()
-                    .background(Color.white)
-                }
-            }
-        }
-        .background(Color.white)
-        .cornerRadius(12)
-        .shadow(radius: 5)
-        .frame(width: 280)
-    }
-    
-    // MARK: - Lifecycle Methods
-    func handleOnAppear() {
-        print("📱 ContentView appeared")
-        print("📱 hasCompletedOnboarding: \(hasCompletedOnboarding)")
-        print("📱 showInteractiveTutorial: \(showInteractiveTutorial)")
-        print("📱 showDeviceSheet: \(showDeviceSheet)")
-        
-        // Show interactive tutorial only on first launch
-        if !hasCompletedOnboarding {
-            print("📱 🎓 Showing interactive tutorial for first time!")
-            // Delay slightly to ensure view is ready
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                showInteractiveTutorial = true
-                print("📱 ✅ showInteractiveTutorial set to true")
-            }
-        } else {
-            // Only show device selection sheet if onboarding is complete
-            if !hasShownInitialSheet && !bleManager.isConnected {
-                hasShownInitialSheet = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    bleManager.startScan()
-                    showDeviceSheet = true
-                    print("📱 📡 Device sheet shown")
-                }
-            }
-        }
-    }
-    
-    // MARK: - NEW FUNCTION: Reset to Default
-    func resetToDefault() {
-        self.config = defaultConfig
-        saveConfigurationIfConnected()
-        print("🔄 Reset to default configuration: \(defaultConfig)")
     }
     
     // MARK: - Custom Menu View
@@ -1272,8 +1186,6 @@ struct ContentView: View {
                         Button(action: {
                             customToRename = custom.id
                             customRenameText = custom.name
-                            print("🔄 Rename button tapped for custom \(custom.id)")
-                            print("🔄 Setting showCustomRenameAlert to true")
                             showCustomRenameAlert = true
                             showCustomsDropdown = false
                         }) {
@@ -1304,86 +1216,221 @@ struct ContentView: View {
     
     // MARK: - Help Menu View
     var helpMenuView: some View {
-        VStack(spacing: 0) {
-            Text("Help")
-                .font(.headline)
-                .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
-                .padding()
-                .frame(maxWidth: .infinity)
-                .background(Color.gray.opacity(0.1))
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Need help?")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.primary)
             
-            Button(action: {
-                showHelpDropdown = false
-                showHelp = true
-            }) {
-                HStack {
-                    Image(systemName: "questionmark.circle")
-                        .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
-                    Text("FAQ")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.black)
-                }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.white)
-            }
+            Text("• Try Undo on Button 1 and Erase on Button 2.\n• Use the scroll wheel for brush size adjustments.\n• Use Buttons 1+2 for less frequent tools like Brush Library.")
+                .font(.system(size: 12))
+                .foregroundColor(.primary)
             
             Divider()
             
-            Button(action: {
-                showHelpDropdown = false
-                showInteractiveTutorial = true
-            }) {
-                HStack {
-                    Image(systemName: "book.circle")
-                        .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
-                    Text("First Time Guide")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.black)
-                }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.white)
-            }
+            Text("If something feels off on the iPad (e.g. zoom or gestures), check your iPad Display settings and Zoom accessibility settings.")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .padding(12)
         .background(Color.white)
         .cornerRadius(12)
         .shadow(radius: 5)
-        .frame(width: 200)
+        .frame(width: 260)
     }
     
-    // MARK: - Helper Functions
-    func getCustomNameForSlot(_ slot: Int) -> String {
-        // Ensure slot is valid (1-5)
-        guard (1...5).contains(slot) else {
-            return "Custom"
+    // MARK: - Save Custom Dropdown View
+    var saveCustomDropdownView: some View {
+        VStack(spacing: 12) {
+            Text("Save Custom")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.primary)
+            
+            Text("Choose a slot to save your current configuration.")
+                .font(.system(size: 12))
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+            
+            ForEach(1...3, id: \.self) { slot in
+                Button(action: {
+                    customToSave = slot
+                    showSaveCustomDropdown = false
+                    showSaveConfirmation = true
+                }) {
+                    HStack {
+                        Text(getCustomNameForSlot(slot))
+                            .font(.system(size: 14, weight: .medium))
+                        Spacer()
+                        if slotIsUsed(slot) {
+                            Text("Overwrite")
+                                .font(.system(size: 12))
+                                .foregroundColor(.red)
+                        } else {
+                            Text("Empty")
+                                .font(.system(size: 12))
+                                .foregroundColor(.green)
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(8)
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+            
+            Button(action: {
+                if let firstAvailable = findFirstAvailableSlot() {
+                    customToSave = firstAvailable
+                    showSaveCustomDropdown = false
+                    showSaveConfirmation = true
+                } else {
+                    customToSave = 1
+                    showSaveCustomDropdown = false
+                    showSaveConfirmation = true
+                }
+            }) {
+                Text("Save to first available")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(Color.blue)
+                    .cornerRadius(8)
+            }
+            
+            Button(action: {
+                showSaveCustomDropdown = false
+            }) {
+                Text("Cancel")
+                    .font(.system(size: 13))
+                    .foregroundColor(.red)
+                    .padding(.top, 4)
+            }
         }
-        
-        if let existingName = UserDefaults.standard.string(forKey: "custom\(slot)Name"), !existingName.isEmpty {
-            return existingName
-        } else {
+        .padding(16)
+        .frame(width: 280)
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(radius: 8)
+    }
+    
+    // MARK: - Save Confirmation Popup
+    func saveConfirmationPopup() -> some View {
+        VStack(spacing: 16) {
+            Text("Save Custom")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.primary)
+            
+            Text("Save as '\(getCustomNameForSlot(customToSave))'?")
+                .font(.system(size: 13))
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+            
+            HStack(spacing: 12) {
+                Button(action: {
+                    saveCustom(slot: customToSave)
+                    saveCustomName(customToSave, name: getCustomNameForSlot(customToSave))
+                    showSaveConfirmation = false
+                }) {
+                    Text("Save")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 8)
+                        .background(Color.blue)
+                        .cornerRadius(8)
+                }
+                
+                Button(action: {
+                    showSaveConfirmation = false
+                }) {
+                    Text("Cancel")
+                        .font(.system(size: 14))
+                        .foregroundColor(.red)
+                }
+            }
+        }
+        .padding(20)
+        .frame(width: 280)
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(radius: 8)
+    }
+    
+    // MARK: - Rename Custom Popup
+    func renameCustomPopup() -> some View {
+        VStack(spacing: 16) {
+            Text("Rename Custom")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.primary)
+            
+            TextField("Enter name", text: $customRenameText)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                .padding(.horizontal, 4)
+            
+            HStack(spacing: 12) {
+                Button(action: {
+                    saveCustomName(customToRename, name: customRenameText.isEmpty ? "Custom \(customToRename)" : customRenameText)
+                    showCustomRenameAlert = false
+                }) {
+                    Text("Save")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 8)
+                        .background(Color.blue)
+                        .cornerRadius(8)
+                }
+                
+                Button(action: {
+                    showCustomRenameAlert = false
+                }) {
+                    Text("Cancel")
+                        .font(.system(size: 14))
+                        .foregroundColor(.red)
+                }
+            }
+        }
+        .padding(20)
+        .frame(width: 280)
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(radius: 8)
+    }
+    
+    // MARK: - Helper Methods for Customs
+    func getCustomNameForSlot(_ slot: Int) -> String {
+        switch slot {
+        case 1:
+            return UserDefaults.standard.string(forKey: "custom1Name") ?? "Custom 1"
+        case 2:
+            return UserDefaults.standard.string(forKey: "custom2Name") ?? "Custom 2"
+        case 3:
+            return UserDefaults.standard.string(forKey: "custom3Name") ?? "Custom 3"
+        default:
             return "Custom \(slot)"
         }
     }
     
-    func findFirstAvailableSlot() -> Int {
-        // Check which custom slots are available (2-5, since 1 is always shown)
-        for slot in 2...5 {
-            switch slot {
-            case 2 where custom2Data.isEmpty:
-                return 2
-            case 3 where custom3Data.isEmpty:
-                return 3
-            case 4 where custom4Data.isEmpty:
-                return 4
-            case 5 where custom5Data.isEmpty:
-                return 5
-            default:
-                continue
-            }
+    func slotIsUsed(_ slot: Int) -> Bool {
+        switch slot {
+        case 1:
+            return !custom1Data.isEmpty
+        case 2:
+            return !custom2Data.isEmpty
+        case 3:
+            return !custom3Data.isEmpty
+        default:
+            return false
         }
-        // If all slots 2-5 are full, return 2 (this shouldn't happen due to the UI logic)
-        return 2
+    }
+    
+    func findFirstAvailableSlot() -> Int? {
+        if custom1Data.isEmpty { return 1 }
+        if custom2Data.isEmpty { return 2 }
+        if custom3Data.isEmpty { return 3 }
+        return nil
     }
     
     func saveCustom(slot: Int) {
@@ -1394,30 +1441,10 @@ struct ContentView: View {
             switch slot {
             case 1:
                 custom1Data = jsonString
-                // Set default name if not already set
-                if UserDefaults.standard.string(forKey: "custom1Name") == nil {
-                    UserDefaults.standard.set("Custom 1", forKey: "custom1Name")
-                }
             case 2:
                 custom2Data = jsonString
-                if UserDefaults.standard.string(forKey: "custom2Name") == nil {
-                    UserDefaults.standard.set("Custom 2", forKey: "custom2Name")
-                }
             case 3:
                 custom3Data = jsonString
-                if UserDefaults.standard.string(forKey: "custom3Name") == nil {
-                    UserDefaults.standard.set("Custom 3", forKey: "custom3Name")
-                }
-            case 4:
-                custom4Data = jsonString
-                if UserDefaults.standard.string(forKey: "custom4Name") == nil {
-                    UserDefaults.standard.set("Custom 4", forKey: "custom4Name")
-                }
-            case 5:
-                custom5Data = jsonString
-                if UserDefaults.standard.string(forKey: "custom5Name") == nil {
-                    UserDefaults.standard.set("Custom 5", forKey: "custom5Name")
-                }
             default:
                 break
             }
@@ -1429,141 +1456,71 @@ struct ContentView: View {
     }
     
     func saveCustomName(_ slot: Int, name: String) {
-        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedName.isEmpty else { return }
-        
-        UserDefaults.standard.set(trimmedName, forKey: "custom\(slot)Name")
-        print("💾 Custom \(slot) renamed to: '\(trimmedName)'")
-        
-        // Force UserDefaults to save immediately
-        UserDefaults.standard.synchronize()
-        
-        // Verify it was saved
-        let savedName = UserDefaults.standard.string(forKey: "custom\(slot)Name")
-        print("💾 Verified saved name: '\(savedName ?? "nil")'")
+        UserDefaults.standard.set(name, forKey: "custom\(slot)Name")
+        print("🔤 Saved name for custom\(slot): \(name)")
     }
     
     func loadCustom(_ custom: Custom) {
-        self.config = custom.config
+        config = custom.config
         saveConfigurationIfConnected()
         print("📥 Loaded custom \(custom.id): \(custom.config)")
     }
     
-    var controllerOutline: some View {
-        GeometryReader { geometry in
-            ZStack {
-                let containerWidth = geometry.size.width
-                let containerHeight = geometry.size.height
-                let centerX = containerWidth / 2
-                
-                Path { path in
-                    let bodyWidth: CGFloat = 480 * 1.3 // EXTENDED LENGTH BY 30% (from 480 to 624)
-                    let bodyHeight: CGFloat = (197.5 * 1.25) - 45 // EXTENDED HEIGHT BY 25% THEN SHORTENED FROM BOTTOM BY 10, THEN CUT 30 MORE
-                    let cornerRadius: CGFloat = 23.5 // Keep current corners
-                    
-                    let bodyRect = CGRect(
-                        x: centerX - bodyWidth / 2,
-                        y: containerHeight / 2 - bodyHeight / 2 - 40, // MOVED UP BY ANOTHER 20 (from -30 to -50)
-                        width: bodyWidth,
-                        height: bodyHeight
-                    )
-                    
-                    // Rounded rectangle for the main body - CHANGED TO DARK GRAY
-                    path.addRoundedRect(
-                        in: bodyRect,
-                        cornerSize: CGSize(width: cornerRadius, height: cornerRadius)
-                    )
-                }
-                .fill(Color.gray.opacity(0.4)) // DARK GRAY FILL (CHANGED FROM BLACK)
-            }
+    // MARK: - Reset Configuration
+    func resetToDefault() {
+        config = defaultConfig
+        saveConfigurationIfConnected()
+        print("🔄 Reset to default configuration: \(config)")
+    }
+    
+    // MARK: - Mapping Functions
+    func iconForButton(configKey: String) -> String {
+        let option = getCurrentSelection(for: configKey)
+        
+        switch option {
+        case "Undo":
+            return "arrow.uturn.backward.circle.fill"
+        case "Redo":
+            return "arrow.uturn.forward.circle.fill"
+        case "Erase":
+            return "eraser.fill"
+        case "Color Palette":
+            return "paintpalette.fill"
+        case "Brush Library":
+            return "square.grid.2x2.fill"
+        case "Brush Size ±5%", "Brush Size ±10%":
+            return "slider.horizontal.3"
+        default:
+            return "circle"
         }
     }
     
-    var connectionLines: some View {
-        GeometryReader { geometry in
-            ZStack {
-                let containerWidth = geometry.size.width
-                let centerX = containerWidth / 2
-                
-                // SHIFT EVERYTHING RIGHT BY 80 TOTAL
-                let offset: CGFloat = 100
-                
-                // DARK PURPLE lines positioned above the outline - MOVED UP BY 100 (from 438 to 338)
-                // UPDATED POSITIONS FOR NEW LAYOUT: Scroll ~> Button 1 ~> Button 2
-                let button1CenterX = centerX - 60 + offset // Button 1 center position (left of center) + offset
-                let button2CenterX = centerX + 60 + offset // Button 2 center position (right of center) + offset
-
-                // Position lines MOVED UP BY 100
-                let buttonBottomY: CGFloat = 308 // MOVED UP BY 100 (from 408 to 308)
-                let horizontalLineY: CGFloat = 338 // MOVED UP BY 100 (from 438 to 338)
-                let textTopY: CGFloat = 358 // MOVED UP BY 100 (from 458 to 358)
-
-                // EXTEND LEFT ENDPOINT BY 10, EXTEND RIGHT ENDPOINT BY 100
-                let horizontalLineStartX = button1CenterX - 10 // Extended left by 10
-                let horizontalLineEndX = button2CenterX + 100   // Extended right by 100
-                
-                // FIXED: Vertical line from EXTENDED LEFT ENDPOINT down (under Button 1)
-                Path { path in
-                    path.move(to: CGPoint(x: horizontalLineStartX, y: buttonBottomY))
-                    path.addLine(to: CGPoint(x: horizontalLineStartX, y: horizontalLineY))
-                }
-                .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), style: StrokeStyle(lineWidth: 2))
-                
-                // Vertical line from EXTENDED RIGHT ENDPOINT down (under Button 2)
-                Path { path in
-                    path.move(to: CGPoint(x: horizontalLineEndX, y: buttonBottomY))
-                    path.addLine(to: CGPoint(x: horizontalLineEndX, y: horizontalLineY))
-                }
-                .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), style: StrokeStyle(lineWidth: 2))
-                
-                // EXTENDED Horizontal line connecting both vertical lines
-                Path { path in
-                    path.move(to: CGPoint(x: horizontalLineStartX, y: horizontalLineY))
-                    path.addLine(to: CGPoint(x: horizontalLineEndX, y: horizontalLineY))
-                }
-                .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), style: StrokeStyle(lineWidth: 2))
-                
-                // Vertical line from horizontal line down to Buttons 1+2 text (CENTERED WITH OFFSET)
-                Path { path in
-                    let centerPointX = (horizontalLineStartX + horizontalLineEndX) / 2
-                    path.move(to: CGPoint(x: centerPointX, y: horizontalLineY))
-                    path.addLine(to: CGPoint(x: centerPointX, y: textTopY))
-                }
-                .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), style: StrokeStyle(lineWidth: 2))
-                
-                // ADD ARROWS TO THE TIP OF VERTICAL DARK PURPLE LINES POINTING UP AT BUTTONS
-                // FIXED: Left arrow at EXTENDED LEFT ENDPOINT (under Button 1)
-                Path { path in
-                    let arrowSize: CGFloat = 8
-                    let tipX = horizontalLineStartX
-                    let tipY = buttonBottomY
-                    
-                    path.move(to: CGPoint(x: tipX, y: tipY))
-                    path.addLine(to: CGPoint(x: tipX - arrowSize, y: tipY + arrowSize))
-                    path.move(to: CGPoint(x: tipX, y: tipY))
-                    path.addLine(to: CGPoint(x: tipX + arrowSize, y: tipY + arrowSize))
-                }
-                .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                
-                // Right arrow at EXTENDED RIGHT ENDPOINT (under Button 2)
-                Path { path in
-                    let arrowSize: CGFloat = 8
-                    let tipX = horizontalLineEndX
-                    let tipY = buttonBottomY
-                    
-                    path.move(to: CGPoint(x: tipX, y: tipY))
-                    path.addLine(to: CGPoint(x: tipX - arrowSize, y: tipY + arrowSize))
-                    path.move(to: CGPoint(x: tipX, y: tipY))
-                    path.addLine(to: CGPoint(x: tipX + arrowSize, y: tipY + arrowSize))
-                }
-                .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), style: StrokeStyle(lineWidth: 2, lineCap: .round))
-            }
+    func labelForButton(configKey: String) -> String {
+        let option = getCurrentSelection(for: configKey)
+        
+        switch option {
+        case "Undo":
+            return "Undo"
+        case "Redo":
+            return "Redo"
+        case "Erase":
+            return "Erase"
+        case "Color Palette":
+            return "Colors"
+        case "Brush Library":
+            return "Brushes"
+        case "Brush Size ±5%":
+            return "Size ±5%"
+        case "Brush Size ±10%":
+            return "Size ±10%"
+        default:
+            return "None"
         }
-        .allowsHitTesting(false)
     }
     
     func getCurrentSelection(for configKey: String) -> String {
         let code = config[configKey] ?? 0
+        
         switch configKey {
         case "scroll":
             return codeToOption(code, validOptions: scrollOptions)
@@ -1572,6 +1529,7 @@ struct ContentView: View {
         case "button2":
             return codeToOption(code, validOptions: circleButton2Options)
         case "button3":
+            // Click on scroll uses full button option set
             return codeToOption(code, validOptions: allButtonOptions)
         case "combo":
             return codeToOption(code, validOptions: buttons12Options)
@@ -1594,7 +1552,6 @@ struct ContentView: View {
         }
     }
     
-    // Convert numeric code to option string, with validation - UPDATED FOR NEW NAMES
     func codeToOption(_ code: Int, validOptions: [String]) -> String {
         let option: String
         switch code {
@@ -1605,123 +1562,143 @@ struct ContentView: View {
         case 7: option = "Color Palette"
         case 8: option = "Brush Library"
         case 9: option = "Brush Size ±10%"
-        default: option = validOptions.first ?? "Undo"
+        default: option = "None"
         }
         
-        // Validate the option is valid for this button
-        if validOptions.contains(option) {
-            return option
-        } else {
-            print("⚠️ Invalid option '\(option)' for valid options: \(validOptions). Using first available.")
-            return validOptions.first ?? "Undo"
-        }
+        return validOptions.contains(option) ? option : validOptions.first ?? "None"
     }
     
+    // MARK: - BLE Integration
     func saveConfigurationIfConnected() {
         if bleManager.isConnected {
-            saveConfiguration()
+            bleManager.writeConfig(config: config)
+            print("📡 Sent config to device: \(config)")
+        } else {
+            print("ℹ️ Not connected, config will be sent when device connects.")
         }
     }
-    
-    func saveConfiguration() {
-        print("📤 Saving configuration:")
-        print("  Full config: \(config)")
-        bleManager.writeConfig(config: config)
-    }
 }
 
-// MARK: - PreferenceKey for tracking view frames
-struct ViewFrameKey: PreferenceKey {
-    static var defaultValue: CGRect = .zero
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
-        value = nextValue()
-    }
-}
-
-struct ComboFrameKey: PreferenceKey {
-    static var defaultValue: CGRect = .zero
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
-        value = nextValue()
-    }
-}
-
-struct ScrollFrameKey: PreferenceKey {
-    static var defaultValue: CGRect = .zero
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
-        value = nextValue()
-    }
-}
-
-struct Button2FrameKey: PreferenceKey {
-    static var defaultValue: CGRect = .zero
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
-        value = nextValue()
-    }
-}
-
-struct ScanButtonFrameKey: PreferenceKey {
-    static var defaultValue: CGRect = .zero
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
-        value = nextValue()
-    }
-}
-
-// MARK: - Device Selection Sheet
-struct DeviceSelectionSheet: View {
+// MARK: - Device Sheet View
+struct DeviceSheetView: View {
     @ObservedObject var bleManager: BLEManager
-    @Binding var showDeviceSheet: Bool
+    @Binding var isPresented: Bool
+    @Binding var scanButtonFrame: CGRect
     
     var body: some View {
-        NavigationView {
-            VStack {
-                if bleManager.isScanning {
-                    VStack(spacing: 20) {
-                        ProgressView().scaleEffect(1.5)
-                        Text("Scanning for XIAO_Config...").font(.headline)
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Device must be in CONFIG MODE:").font(.caption).foregroundColor(.gray).bold()
-                            Text("• First boot: Automatic").font(.caption).foregroundColor(.gray)
-                            Text("• Otherwise: Hold RESET 5 seconds").font(.caption).foregroundColor(.gray)
-                        }
-                        .padding()
-                        .background(Color.orange.opacity(0.1))
-                        .cornerRadius(8)
-                    }.frame(maxHeight: .infinity).padding()
-                } else if bleManager.devices.isEmpty {
-                    VStack(spacing: 20) {
-                        Image(systemName: "exclamationmark.triangle").font(.system(size: 50)).foregroundColor(.orange)
-                        Text("No XIAO_Config Found").font(.headline)
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("To enter CONFIG MODE:").font(.subheadline).bold()
-                            Text("1️⃣ First boot: Device starts in CONFIG mode automatically").font(.caption)
-                            Text("2️⃣ After configuration: Hold RESET button for 5 seconds").font(.caption)
-                            Text("3️⃣ LED will flash rapidly 10 times").font(.caption)
-                            Text("4️⃣ Device shows as 'XIAO_Config'").font(.caption)
-                            Text("").font(.caption)
-                            Text("⚠️ If device was paired to iPad:").font(.subheadline).bold().foregroundColor(.red)
-                            Text("Go to Settings → Bluetooth → Forget 'XIAO Keyboard'").font(.caption).foregroundColor(.red)
-                            Text("Then hold RESET button again").font(.caption).foregroundColor(.red)
-                        }
-                        .padding()
-                        .background(Color.orange.opacity(0.1))
-                        .cornerRadius(8)
-                        Button("Scan Again") { bleManager.startScan() }.buttonStyle(.borderedProminent).tint(.orange)
-                    }.frame(maxHeight: .infinity).padding()
-                } else {
-                    List(bleManager.devices, id: \.identifier) { device in
-                        Button(action: { bleManager.connect(to: device); showDeviceSheet = false }) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(device.name ?? "Unknown Device").font(.headline)
-                                Text(device.identifier.uuidString).font(.caption).foregroundColor(.gray)
-                            }.padding(.vertical, 8)
-                        }
-                    }
-                    Text("Found \(bleManager.devices.count) device(s)").font(.caption).foregroundColor(.gray).padding()
+        VStack(spacing: 0) {
+            Capsule()
+                .fill(Color.gray.opacity(0.5))
+                .frame(width: 40, height: 5)
+                .padding(.top, 8)
+            
+            HStack {
+                Text("CoBrush Devices")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.primary)
+                Spacer()
+                Button(action: {
+                    isPresented = false
+                }) {
+                    Image(systemName: "xmark")
+                        .foregroundColor(.secondary)
                 }
             }
-            .navigationTitle("Select Device")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button("Cancel") { bleManager.stopScan(); showDeviceSheet = false } } }
+            .padding([.top, .horizontal])
+            
+            Divider()
+            
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    if bleManager.devices.isEmpty {
+                        Text("No devices found.\n\nMake sure your CoBrush controller is powered on and nearby, then tap Scan again.")
+                            .font(.system(size: 13))
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.leading)
+                            .padding(.top, 16)
+                    } else {
+                        ForEach(bleManager.devices, id: \.identifier) { device in
+                            Button(action: {
+                                bleManager.connect(to: device)
+                                isPresented = false
+                            }) {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(device.name ?? "Unknown Device")
+                                            .font(.system(size: 14, weight: .medium))
+                                            .foregroundColor(.primary)
+                                        
+                                        Text(device.identifier.uuidString)
+                                            .font(.system(size: 11))
+                                            .foregroundColor(.secondary)
+                                    }
+                                    Spacer()
+                                    if bleManager.isConnected && bleManager.connectedDevice?.identifier == device.identifier {
+                                        Text("Connected")
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundColor(.green)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(Color.green.opacity(0.1))
+                                            .cornerRadius(8)
+                                    } else {
+                                        Text("Connect")
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundColor(.blue)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(Color.blue.opacity(0.1))
+                                            .cornerRadius(8)
+                                    }
+                                }
+                                .padding(.horizontal)
+                                .padding(.vertical, 8)
+                                .background(Color.white)
+                                .cornerRadius(10)
+                                .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                    }
+                }
+                .padding()
+            }
+            
+            Divider()
+            
+            HStack {
+                Spacer()
+                Button(action: {
+                    if bleManager.isScanning {
+                        bleManager.stopScan()
+                    } else {
+                        bleManager.startScan()
+                    }
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: bleManager.isScanning ? "stop.circle.fill" : "magnifyingglass.circle.fill")
+                        Text(bleManager.isScanning ? "Stop Scan" : "Scan for Devices")
+                    }
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(Color.blue)
+                    .cornerRadius(10)
+                }
+                Spacer()
+            }
+            .padding()
         }
+        .background(Color(UIColor.systemGroupedBackground))
+        .cornerRadius(20)
+        .shadow(radius: 20)
+    }
+}
+
+// MARK: - Preview
+struct ContentView_Previews: PreviewProvider {
+    static var previews: some View {
+        ContentView()
     }
 }
