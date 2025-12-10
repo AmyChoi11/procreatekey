@@ -69,45 +69,21 @@ struct ProblemNotificationView: View {
             return AnyView(EmptyView())
         }
         
-        let title: String
-        let iconName: String
-        let color: Color
-        
-        switch problem {
-        case .ipadZoom:
-            title = "Zoom Level Issue"
-            iconName = "exclamationmark.triangle.fill"
-            color = .orange
-        case .unknown(let message):
-            title = "Notice"
-            iconName = "info.circle.fill"
-            color = .blue
-            print("🔍 Unknown problem: \(message)")
-        }
-        
         return AnyView(
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
-                    Image(systemName: iconName)
-                        .foregroundColor(color)
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.orange)
                         .font(.system(size: 16, weight: .bold))
-                    Text(title)
+                    Text(problem.title)
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(color)
+                        .foregroundColor(.orange)
                 }
                 
-                switch problem {
-                case .ipadZoom:
-                    Text("If your gestures aren't matching what you expect, check your iPad zoom settings. Make sure:\n• Display Zoom is set to 'Standard'\n• Zoom accessibility feature is turned off")
-                        .font(.system(size: 12))
-                        .foregroundColor(.primary)
-                        .fixedSize(horizontal: false, vertical: true)
-                case .unknown(let message):
-                    Text(message)
-                        .font(.system(size: 12))
-                        .foregroundColor(.primary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                Text(problem.steps.joined(separator: "\n"))
+                    .font(.system(size: 12))
+                    .foregroundColor(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .padding(12)
             .background(Color.yellow.opacity(0.1))
@@ -419,8 +395,8 @@ struct ContentView: View {
                                                         Color(red: 0.93, green: 0.93, blue: 0.96),
                                                         Color(red: 0.85, green: 0.85, blue: 0.90)
                                                     ]),
-                                                    startPoint: .topLeft,
-                                                    endPoint: .bottomRight
+                                                    startPoint: .top,
+                                                    endPoint: .bottom
                                                 )
                                             )
                                             .frame(width: 42 * buttonScale, height: 42 * buttonScale)
@@ -1117,7 +1093,7 @@ struct ContentView: View {
                 }
             }
             .sheet(isPresented: $showOnboarding) {
-                OnboardingView(showOnboarding: $showOnboarding, hasCompletedOnboarding: $hasCompletedOnboarding)
+                OnboardingView(showOnboarding: $showOnboarding)
             }
             .sheet(isPresented: $showInteractiveTutorial) {
                 InteractiveTutorialView(
