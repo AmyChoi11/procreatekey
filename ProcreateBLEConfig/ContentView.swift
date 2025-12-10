@@ -1584,60 +1584,76 @@ struct DeviceSheetView: View {
             
             Divider()
             
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    if bleManager.devices.isEmpty {
-                        Text("No devices found.\n\nMake sure your CoBrush controller is powered on and nearby, then tap Scan again.")
-                            .font(.system(size: 13))
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.leading)
-                            .padding(.top, 16)
-                    } else {
-                        ForEach(bleManager.devices, id: \.identifier) { device in
-                            DeviceRowButton(
-                                device: device,
-                                isConnected: bleManager.isConnected,
-                                connectedDeviceId: bleManager.connectedDevice?.identifier,
-                                onTap: {
-                                    bleManager.connect(to: device)
-                                    isPresented = false
-                                }
-                            )
-                        }
-                    }
-                }
-                .padding()
-            }
+            deviceListSection
             
             Divider()
             
-            HStack {
-                Spacer()
-                Button(action: {
-                    if bleManager.isScanning {
-                        bleManager.stopScan()
-                    } else {
-                        bleManager.startScan()
-                    }
-                }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: bleManager.isScanning ? "stop.circle.fill" : "magnifyingglass.circle.fill")
-                        Text(bleManager.isScanning ? "Stop Scan" : "Scan for Devices")
-                    }
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(Color.blue)
-                    .cornerRadius(10)
-                }
-                Spacer()
-            }
-            .padding()
+            scanButtonSection
         }
         .background(Color(UIColor.systemGroupedBackground))
         .cornerRadius(20)
         .shadow(radius: 20)
+    }
+    
+    private var deviceListSection: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                if bleManager.devices.isEmpty {
+                    emptyStateView
+                } else {
+                    deviceListView
+                }
+            }
+            .padding()
+        }
+    }
+    
+    private var emptyStateView: some View {
+        Text("No devices found.\n\nMake sure your CoBrush controller is powered on and nearby, then tap Scan again.")
+            .font(.system(size: 13))
+            .foregroundColor(.secondary)
+            .multilineTextAlignment(.leading)
+            .padding(.top, 16)
+    }
+    
+    private var deviceListView: some View {
+        ForEach(bleManager.devices, id: \.identifier) { device in
+            DeviceRowButton(
+                device: device,
+                isConnected: bleManager.isConnected,
+                connectedDeviceId: bleManager.connectedDevice?.identifier,
+                onTap: {
+                    bleManager.connect(to: device)
+                    isPresented = false
+                }
+            )
+        }
+    }
+    
+    private var scanButtonSection: some View {
+        HStack {
+            Spacer()
+            Button(action: {
+                if bleManager.isScanning {
+                    bleManager.stopScan()
+                } else {
+                    bleManager.startScan()
+                }
+            }) {
+                HStack(spacing: 6) {
+                    Image(systemName: bleManager.isScanning ? "stop.circle.fill" : "magnifyingglass.circle.fill")
+                    Text(bleManager.isScanning ? "Stop Scan" : "Scan for Devices")
+                }
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(Color.blue)
+                .cornerRadius(10)
+            }
+            Spacer()
+        }
+        .padding()
     }
 }
 
