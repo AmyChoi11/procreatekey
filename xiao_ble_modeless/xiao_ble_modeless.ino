@@ -198,8 +198,7 @@ class ConfigCallbacks : public BLECharacteristicCallbacks {
     buttons["button2"] = config.button2;
     buttons["button3"] = config.button3;
     buttons["combo"] = config.combo;
-    buttons["scroll"] = config.scroll;
-    
+    buttons["scroll"] = config.scroll;    doc[\"currentCustom\"] = currentCustom;  // Tell iOS which custom is active (0, 1, or 2)    
     String output;
     serializeJson(doc, output);
     pChar->setValue(output.c_str());

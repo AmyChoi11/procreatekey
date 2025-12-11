@@ -9,6 +9,7 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
     @Published var isScanning: Bool = false
     @Published var bluetoothState: CBManagerState = .unknown
     @Published var currentConfig: [String: Int] = ["button1": 3, "button2": 3, "button3": 3, "combo": 7, "scroll": 9]
+    @Published var currentCustom: Int = 0  // 0 = Custom 1, 1 = Custom 2, 2 = Custom 3
     @Published var detectedProblem: DetectedProblem?
     
     private var central: CBCentralManager!
@@ -325,6 +326,11 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
                    let buttons = json["buttons"] as? [String: Int] {
                     DispatchQueue.main.async {
                         self.currentConfig = buttons
+                        // Extract currentCustom if provided (0 = Custom 1, 1 = Custom 2, 2 = Custom 3)
+                        if let custom = json["currentCustom"] as? Int {
+                            self.currentCustom = custom
+                            print("✓ Current custom preset: \(custom + 1)")
+                        }
                         self.statusMessage = "✓ Config loaded from device!"
                         print("✓ Parsed config: \(buttons)")
                     }
