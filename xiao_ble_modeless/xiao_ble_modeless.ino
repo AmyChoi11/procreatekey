@@ -52,8 +52,8 @@
 #define BUTTON3_PIN 9
 #define ENCODER_A   7
 #define ENCODER_B   6
-#define SWITCH_LEFT  16  // 3-position switch left (Custom 1)
-#define SWITCH_RIGHT 15  // 3-position switch right (Custom 3)
+#define SWITCH_LEFT  1  // 3-position switch left (Custom 1)
+#define SWITCH_RIGHT 3  // 3-position switch right (Custom 3)
 #define LED_PIN     2
 
 // ============= Key Codes =============
@@ -97,6 +97,16 @@ BLECharacteristic* configChar = nullptr;
 
 bool deviceConnected = false;
 bool oldDeviceConnected = false;
+
+// ============= Helper Functions =============
+const char* getCustomName(int customNum) {
+  switch(customNum) {
+    case 0: return "Custom 1";
+    case 1: return "Custom 2";
+    case 2: return "Custom 3";
+    default: return "Unknown";
+  }
+}
 
 // ============= BLE Server Callbacks =============
 class ServerCallbacks : public BLEServerCallbacks {
@@ -142,40 +152,59 @@ class ConfigCallbacks : public BLECharacteristicCallbacks {
       if (doc.containsKey("buttons")) {
         JsonObject buttons = doc["buttons"];
         
-        // Update in-memory config
-        config.button1 = buttons["button1"].as<int>();
-        config.button2 = buttons["button2"].as<int>();
-        config.button3 = buttons["button3"].as<int>();
-        config.combo = buttons["combo"].as<int>();
-        config.scroll = buttons["scroll"].as<int>();
+        // Check if iOS is specifying which custom to save to
+        int targetCustom = currentCustom;  // Default to current custom
+        if (doc.containsKey("targetCustom")) {
+          targetCustom = doc["targetCustom"].as<int>();
+          targetCustom = constrain(targetCustom, 0, MAX_CUSTOMS - 1);
+          Serial.printf("📍 iOS specified target: %s\n", getCustomName(targetCustom));
+        } else {
+          Serial.printf("📍 No target specified, using current: %s\n", getCustomName(currentCustom));
+        }
+        
+        // Create config to save
+        ButtonConfig configToSave;
+        configToSave.button1 = buttons["button1"].as<int>();
+        configToSave.button2 = buttons["button2"].as<int>();
+        configToSave.button3 = buttons["button3"].as<int>();
+        configToSave.combo = buttons["combo"].as<int>();
+        configToSave.scroll = buttons["scroll"].as<int>();
         
         // Constrain values
-        config.button1 = constrain(config.button1, 0, 11);
-        config.button2 = constrain(config.button2, 0, 11);
-        config.button3 = constrain(config.button3, 0, 11);
-        config.combo = constrain(config.combo, 0, 11);
-        config.scroll = constrain(config.scroll, 0, 11);
+        configToSave.button1 = constrain(configToSave.button1, 0, 11);
+        configToSave.button2 = constrain(configToSave.button2, 0, 11);
+        configToSave.button3 = constrain(configToSave.button3, 0, 11);
+        configToSave.combo = constrain(configToSave.combo, 0, 11);
+        configToSave.scroll = constrain(configToSave.scroll, 0, 11);
         
-        // Save to current custom preset
+        // Save to target custom preset (may be different from current!)
         prefs.begin("customs", false);
-        String prefix = "c" + String(currentCustom) + "_";
-        prefs.putInt((prefix + "b1").c_str(), config.button1);
-        prefs.putInt((prefix + "b2").c_str(), config.button2);
-        prefs.putInt((prefix + "b3").c_str(), config.button3);
-        prefs.putInt((prefix + "combo").c_str(), config.combo);
-        prefs.putInt((prefix + "scroll").c_str(), config.scroll);
+        String prefix = "c" + String(targetCustom) + "_";
+        prefs.putInt((prefix + "b1").c_str(), configToSave.button1);
+        prefs.putInt((prefix + "b2").c_str(), configToSave.button2);
+        prefs.putInt((prefix + "b3").c_str(), configToSave.button3);
+        prefs.putInt((prefix + "combo").c_str(), configToSave.combo);
+        prefs.putInt((prefix + "scroll").c_str(), configToSave.scroll);
         prefs.end();
         
         // Update in-memory custom
-        customs[currentCustom] = config;
+        customs[targetCustom] = configToSave;
         
-        Serial.println("\n✅ CONFIG SAVED & APPLIED!");
-        Serial.printf("  Saved to: %s\n", getCustomName(currentCustom));
-        Serial.printf("  Button 1: %d\n", config.button1);
-        Serial.printf("  Button 2: %d\n", config.button2);
-        Serial.printf("  Button 3: %d\n", config.button3);
-        Serial.printf("  Combo (1+2): %d\n", config.combo);
-        Serial.printf("  Scroll: %d\n", config.scroll);
+        // If saving to the current custom, also update running config
+        if (targetCustom == currentCustom) {
+          config = configToSave;
+          Serial.println("\n✅ CONFIG SAVED & APPLIED!");
+        } else {
+          Serial.println("\n✅ CONFIG SAVED!");
+          Serial.printf("  (Not applied - you're on %s)\n", getCustomName(currentCustom));
+        }
+        
+        Serial.printf("  Saved to: %s\n", getCustomName(targetCustom));
+        Serial.printf("  Button 1: %d\n", configToSave.button1);
+        Serial.printf("  Button 2: %d\n", configToSave.button2);
+        Serial.printf("  Button 3: %d\n", configToSave.button3);
+        Serial.printf("  Combo (1+2): %d\n", configToSave.combo);
+        Serial.printf("  Scroll: %d\n", configToSave.scroll);
         Serial.println("========================================\n");
         
         // Visual confirmation - triple blink
@@ -198,7 +227,9 @@ class ConfigCallbacks : public BLECharacteristicCallbacks {
     buttons["button2"] = config.button2;
     buttons["button3"] = config.button3;
     buttons["combo"] = config.combo;
-    buttons["scroll"] = config.scroll;    doc[\"currentCustom\"] = currentCustom;  // Tell iOS which custom is active (0, 1, or 2)    
+    buttons["scroll"] = config.scroll;
+    doc["currentCustom"] = currentCustom;  // Tell iOS which custom is active (0, 1, or 2)
+    
     String output;
     serializeJson(doc, output);
     pChar->setValue(output.c_str());
@@ -310,15 +341,6 @@ int getSwitchMode() {
   
   // Default to Custom 2 if invalid state
   return 1;
-}
-
-const char* getCustomName(int customNum) {
-  switch(customNum) {
-    case 0: return "Custom 1";
-    case 1: return "Custom 2";
-    case 2: return "Custom 3";
-    default: return "Unknown";
-  }
 }
 
 void loadCustom(int customNum) {

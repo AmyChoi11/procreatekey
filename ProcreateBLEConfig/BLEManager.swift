@@ -151,6 +151,38 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
             statusMessage = "⚠️ Failed to create config"
         }
     }
+    
+    func writeConfigToCustom(config: [String: Int], targetCustom: Int) {
+        guard let char = configChar, let peripheral = targetPeripheral else {
+            print("❌ Cannot write: characteristic or peripheral not available")
+            statusMessage = "⚠️ Not connected to device"
+            return
+        }
+        
+        // Include targetCustom in the JSON so ESP32 knows which slot to save to
+        let payload: [String: Any] = [
+            "buttons": config,
+            "targetCustom": targetCustom
+        ]
+        
+        let json = try? JSONSerialization.data(withJSONObject: payload, options: [])
+        if let json = json {
+            let jsonString = String(data: json, encoding: .utf8) ?? "invalid"
+            print("\n========================================")
+            print("📤 WRITING CONFIG TO ESP32 CUSTOM \(targetCustom + 1)")
+            print("========================================")
+            print("JSON: \(jsonString)")
+            print("Config dict: \(config)")
+            print("Target Custom: \(targetCustom) (0=Custom1, 1=Custom2, 2=Custom3)")
+            print("========================================\n")
+            
+            peripheral.writeValue(json, for: char, type: .withResponse)
+            statusMessage = "Saving to Custom \(targetCustom + 1)..."
+        } else {
+            print("❌ Failed to serialize JSON")
+            statusMessage = "⚠️ Failed to create config"
+        }
+    }
 
     // MARK: CBCentralManagerDelegate
     func centralManagerDidUpdateState(_ central: CBCentralManager) {

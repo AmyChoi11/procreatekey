@@ -1413,7 +1413,17 @@ struct ContentView: View {
                 break
             }
             
-            print("💾 Custom \(slot) saved: \(config)")
+            print("💾 Custom \(slot) saved locally: \(config)")
+            
+            // CRITICAL: Also send to ESP32 with targetCustom parameter
+            // This allows saving to any custom, not just the current one
+            if bleManager.isConnected {
+                let targetCustom = slot - 1  // Convert 1-based slot to 0-based index
+                bleManager.writeConfigToCustom(config: config, targetCustom: targetCustom)
+                print("📤 Sent to ESP32 targeting Custom \(slot)")
+            } else {
+                print("⚠️ Not connected - will sync when connected")
+            }
         } catch {
             print("❌ Failed to save custom: \(error)")
         }
