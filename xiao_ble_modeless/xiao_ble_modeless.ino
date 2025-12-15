@@ -54,7 +54,6 @@
 #define ENCODER_B   6
 #define SWITCH_LEFT  1  // 3-position switch left (Custom 1)
 #define SWITCH_RIGHT 3  // 3-position switch right (Custom 3)
-#define LED_PIN     2
 
 // ============= Key Codes =============
 #define KEY_LEFT_BRACKET  0x2F  // [
@@ -113,13 +112,11 @@ class ServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) {
     deviceConnected = true;
     Serial.println("✓ Client connected");
-    digitalWrite(LED_PIN, HIGH);
   }
   
   void onDisconnect(BLEServer* pServer) {
     deviceConnected = false;
     Serial.println("✗ Client disconnected");
-    digitalWrite(LED_PIN, LOW);
     
     // Restart advertising
     delay(500);
@@ -206,14 +203,6 @@ class ConfigCallbacks : public BLECharacteristicCallbacks {
         Serial.printf("  Combo (1+2): %d\n", configToSave.combo);
         Serial.printf("  Scroll: %d\n", configToSave.scroll);
         Serial.println("========================================\n");
-        
-        // Visual confirmation - triple blink
-        for(int i=0; i<3; i++) {
-          digitalWrite(LED_PIN, LOW);
-          delay(100);
-          digitalWrite(LED_PIN, HIGH);
-          delay(100);
-        }
       } else {
         Serial.println("⚠️ No 'buttons' key in JSON");
       }
@@ -413,7 +402,6 @@ void setup() {
   pinMode(ENCODER_B, INPUT_PULLUP);
   pinMode(SWITCH_LEFT, INPUT_PULLDOWN);   // 3-position switch left
   pinMode(SWITCH_RIGHT, INPUT_PULLDOWN);  // 3-position switch right
-  pinMode(LED_PIN, OUTPUT);
   
   attachInterrupt(digitalPinToInterrupt(ENCODER_A), handleEncoder, CHANGE);
   attachInterrupt(digitalPinToInterrupt(ENCODER_B), handleEncoder, CHANGE);
@@ -510,14 +498,6 @@ void setup() {
   Serial.println("🔧 iOS App: Open anytime to reconfigure");
   Serial.println("   (No button press needed!)");
   Serial.println("========================================\n");
-  
-  // Startup LED pattern
-  for(int i=0; i<3; i++) {
-    digitalWrite(LED_PIN, HIGH);
-    delay(100);
-    digitalWrite(LED_PIN, LOW);
-    delay(100);
-  }
 }
 
 // ============= Loop =============
@@ -528,13 +508,6 @@ static bool comboPressed = false;
 static long lastEncoderPos = 0;
 
 void loop() {
-  // LED: ON when connected, OFF when disconnected
-  if (deviceConnected) {
-    digitalWrite(LED_PIN, HIGH);
-  } else {
-    digitalWrite(LED_PIN, LOW);
-  }
-  
   // ========== CUSTOM PRESET SWITCHING ==========
   // Check 3-position switch for custom changes
   int currentMode = getSwitchMode();
@@ -551,11 +524,6 @@ void loop() {
       
       loadCustom(currentMode);
       lastSwitchMode = currentMode;
-      
-      // Visual feedback - quick blink
-      digitalWrite(LED_PIN, LOW);
-      delay(100);
-      digitalWrite(LED_PIN, deviceConnected ? HIGH : LOW);
       
       Serial.println("========================================\n");
     }
