@@ -11,20 +11,82 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
     @Published var currentConfig: [String: Int] = ["button1": 3, "button2": 3, "button3": 3, "combo": 7, "scroll": 9]
     @Published var currentCustom: Int = 0  // 0 = Custom 1, 1 = Custom 2, 2 = Custom 3
     @Published var detectedProblem: DetectedProblem?
+    @Published var isConnectionStable: Bool = false
+    @Published var isInitializing = true
     
     private var central: CBCentralManager!
     private var targetPeripheral: CBPeripheral?
     private let serviceUUID = CBUUID(string: "12345678-1234-5678-1234-56789abcdef0")
     private let configCharUUID = CBUUID(string: "12345678-1234-5678-1234-56789abcdef1")
+    private let hidServiceUUID = CBUUID(string: "1812") // Standard HID Service UUID
     private var configChar: CBCharacteristic?
     private var scanTimer: Timer?
     private var noDevicesTimer: Timer?
     private var connectionTimeout: Timer?
     private var configPollTimer: Timer?  // Auto-poll config to detect hardware switch changes
+    private var connectionCheckTimer: Timer?  // Periodic connection verification
+    
+    // App lifecycle state
+    private var isAppActive = true
+    private var shouldReconnectOnActive = false
 
     override init() {
         super.init()
         central = CBCentralManager(delegate: self, queue: nil)
+        updateStatusMessage("Initializing Bluetooth...")
+    }
+    
+    deinit {
+        stopAllTimers()
+    }
+    
+    // MARK: - Lifecycle Management
+    
+    func pauseBLEOperations() {
+        print("⏸️ Pausing BLE operations")
+        stopAllTimers()
+        
+        if isScanning {
+            stopScan()
+        }
+    }
+    
+    func resumeBLEOperations() {
+        print("▶️ Resuming BLE operations")
+        
+        guard isAppActive else {
+            print("⚠️ App not active, not resuming")
+            return
+        }
+        
+        if isConnected {
+            print("✅ Starting timers for connected device")
+            startConfigPolling()
+            startConnectionCheckTimer()
+            
+            // Read current state
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.pollCurrentConfig()
+            }
+        }
+    }
+    
+    private func stopAllTimers() {
+        scanTimer?.invalidate()
+        scanTimer = nil
+        noDevicesTimer?.invalidate()
+        noDevicesTimer = nil
+        connectionTimeout?.invalidate()
+        connectionTimeout = nil
+        stopConfigPolling()
+        stopConnectionCheckTimer()
+    }
+    
+    private func updateStatusMessage(_ message: String) {
+        DispatchQueue.main.async {
+            self.statusMessage = message
+            print("📢 Status: \(message)")
+        }
     }
 
     func startScan() {
@@ -124,8 +186,64 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
         if let peripheral = targetPeripheral {
             central.cancelPeripheralConnection(peripheral)
         }
-        isConnected = false
-        statusMessage = "Disconnected"
+        cleanupConnection()
+        updateStatusMessage("Disconnected from XIAO")
+    }
+    
+    private func cleanupConnection() {
+        DispatchQueue.main.async {
+            self.isConnected = false
+            self.isConnectionStable = false
+        }
+        targetPeripheral = nil
+        configChar = nil
+        stopAllTimers()
+    }
+    
+    func verifyConnection() {
+        guard let peripheral = targetPeripheral else {
+            DispatchQueue.main.async {
+                self.isConnected = false
+                self.isConnectionStable = false
+            }
+            return
+        }
+        
+        print("🔍 Verifying connection - Peripheral state: \(peripheral.state.rawValue)")
+        
+        switch peripheral.state {
+        case .connected:
+            DispatchQueue.main.async {
+                self.isConnected = true
+                self.isConnectionStable = true
+            }
+            print("✅ Peripheral is connected")
+            
+        case .connecting:
+            print("⏳ Peripheral is connecting...")
+            
+        case .disconnected:
+            print("⚠️ Peripheral is disconnected")
+            DispatchQueue.main.async {
+                self.isConnected = false
+                self.isConnectionStable = false
+            }
+            
+            if self.isConnected {
+                updateStatusMessage("Disconnected from XIAO")
+                cleanupConnection()
+            }
+            
+        case .disconnecting:
+            print("⏳ Peripheral is disconnecting...")
+            DispatchQueue.main.async {
+                self.isConnected = false
+                self.isConnectionStable = false
+            }
+            
+        @unknown default:
+            print("❓ Unknown peripheral state: \(peripheral.state.rawValue)")
+        }
     }
 
     func writeConfig(config: [String: Int]) {
@@ -185,9 +303,10 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
         }
     }
 
-    // MARK: CBCentralManagerDelegate
+    // MARK: - CBCentralManagerDelegate
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
         bluetoothState = central.state
+        isInitializing = false
         
         #if targetEnvironment(simulator)
         statusMessage = "⚠️ Bluetooth not available in Simulator. Please test on a real device."
@@ -196,15 +315,40 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
         
         switch central.state {
         case .poweredOn:
-            statusMessage = "Bluetooth ready"
+            print("✅ Bluetooth is powered on")
+            updateStatusMessage("Bluetooth ready")
+            
         case .poweredOff:
-            statusMessage = "⚠️ Please turn on Bluetooth in Settings"
+            print("❌ Bluetooth is powered off")
+            cleanupConnection()
+            updateStatusMessage("⚠️ Please turn on Bluetooth in Settings")
+            detectedProblem = .bluetoothOff
+            
+        case .resetting:
+            print("🔄 Bluetooth is resetting")
+            cleanupConnection()
+            updateStatusMessage("Bluetooth resetting...")
+            
         case .unauthorized:
-            statusMessage = "⚠️ Bluetooth permission denied. Check Settings."
+            print("❌ Bluetooth is unauthorized")
+            cleanupConnection()
+            updateStatusMessage("⚠️ Bluetooth permission denied. Check Settings.")
+            detectedProblem = .noPermission
+            
         case .unsupported:
-            statusMessage = "⚠️ Bluetooth not supported on this device"
-        default:
-            statusMessage = "Bluetooth initializing..."
+            print("❌ Bluetooth is unsupported")
+            cleanupConnection()
+            updateStatusMessage("⚠️ Bluetooth not supported on this device")
+            
+        case .unknown:
+            print("❓ Bluetooth state unknown")
+            cleanupConnection()
+            updateStatusMessage("Bluetooth initializing...")
+            
+        @unknown default:
+            print("❓ Unknown Bluetooth state")
+            cleanupConnection()
+            updateStatusMessage("Bluetooth status unknown")
         }
     }
 
@@ -247,13 +391,24 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
     }
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
-        isConnected = true
-        statusMessage = "✓ Connected! Discovering services..."
-        print("✓ Connected to: \(peripheral.name ?? "Unknown")")
+        print("✅ Connected to \(peripheral.name ?? "unknown device")")
+        
+        DispatchQueue.main.async {
+            self.isConnected = true
+            self.isConnectionStable = true
+            self.updateStatusMessage("✓ Connected! Discovering services...")
+        }
+        
+        targetPeripheral = peripheral
+        peripheral.delegate = self
+        
         peripheral.discoverServices(nil) // Discover all services
         
-        // Start polling config every 2 seconds to detect hardware switch changes
-        startConfigPolling()
+        // Start timers after connection established
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            self.startConfigPolling()
+            self.startConnectionCheckTimer()
+        }
     }
     
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
@@ -263,9 +418,9 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
     }
     
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
-        isConnected = false
-        configChar = nil  // Clear the characteristic
-        stopConfigPolling()  // Stop polling when disconnected
+        print("❌ Disconnected from \(peripheral.name ?? "unknown device")")
+        
+        cleanupConnection()
         
         if let error = error {
             let errorMessage = error.localizedDescription
@@ -273,13 +428,13 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
             
             // Check if it's a timeout (common when device restarts)
             if errorMessage.contains("timed out") || errorMessage.contains("time out") {
-                statusMessage = "Disconnected (device may have restarted)"
+                updateStatusMessage("Disconnected (device may have restarted)")
                 print("💡 This is normal if device is restarting into CONFIG mode")
             } else {
-                statusMessage = "Disconnected: \(errorMessage)"
+                updateStatusMessage("Disconnected: \(errorMessage)")
             }
         } else {
-            statusMessage = "Disconnected"
+            updateStatusMessage("Disconnected")
             print("🔌 Disconnected from: \(peripheral.name ?? "Unknown")")
         }
     }
@@ -392,12 +547,20 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
             print("✓ Config written to device")
         }
     }
-    
-    deinit {
-        scanTimer?.invalidate()
-        noDevicesTimer?.invalidate()
-        connectionTimeout?.invalidate()
-        configPollTimer?.invalidate()
+    func peripheral(_ peripheral: CBPeripheral, didReadRSSI RSSI: NSNumber, error: Error?) {
+        if let error = error {
+            print("❌ Error reading RSSI: \(error.localizedDescription)")
+            isConnectionStable = false
+        } else {
+            let rssiValue = RSSI.intValue
+            print("📶 RSSI: \(rssiValue) dBm")
+            
+            isConnectionStable = rssiValue > -80
+            
+            if !isConnectionStable && rssiValue < -90 {
+                updateStatusMessage("⚠️ Weak connection to XIAO")
+            }
+        }
     }
     
     // MARK: - Config Polling
@@ -407,7 +570,11 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
         
         // Poll config every 0.5 seconds to detect hardware switch changes instantly
         configPollTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            self?.pollCurrentConfig()
+            guard let self = self, self.isConnected, self.isAppActive else {
+                print("⏸️ Config polling paused")
+                return
+            }
+            self.pollCurrentConfig()
         }
         print("🔄 Started config polling (every 0.5 seconds)")
     }
@@ -421,5 +588,22 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
     private func pollCurrentConfig() {
         guard let char = configChar, let peripheral = targetPeripheral else { return }
         peripheral.readValue(for: char)
+    }
+    
+    private func startConnectionCheckTimer() {
+        stopConnectionCheckTimer()
+        
+        connectionCheckTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+            guard let self = self, self.isConnected, self.isAppActive else {
+                print("⏸️ Connection check timer paused")
+                return
+            }
+            self.verifyConnection()
+        }
+    }
+    
+    private func stopConnectionCheckTimer() {
+        connectionCheckTimer?.invalidate()
+        connectionCheckTimer = nil
     }
 }
