@@ -9,6 +9,7 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
     @Published var isScanning: Bool = false
     @Published var bluetoothState: CBManagerState = .unknown
     @Published var currentConfig: [String: Int] = ["button1": 3, "button2": 3, "button3": 3, "combo": 7, "scroll": 9]
+    @Published var currentCustom: Int = 0  // 0 = Custom 1, 1 = Custom 2, 2 = Custom 3
     @Published var detectedProblem: DetectedProblem?
     
     private var central: CBCentralManager!
@@ -145,6 +146,38 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
             
             peripheral.writeValue(json, for: char, type: .withResponse)
             statusMessage = "Sending config..."
+        } else {
+            print("❌ Failed to serialize JSON")
+            statusMessage = "⚠️ Failed to create config"
+        }
+    }
+    
+    func writeConfigToCustom(config: [String: Int], targetCustom: Int) {
+        guard let char = configChar, let peripheral = targetPeripheral else {
+            print("❌ Cannot write: characteristic or peripheral not available")
+            statusMessage = "⚠️ Not connected to device"
+            return
+        }
+        
+        // Include targetCustom in the JSON so ESP32 knows which slot to save to
+        let payload: [String: Any] = [
+            "buttons": config,
+            "targetCustom": targetCustom
+        ]
+        
+        let json = try? JSONSerialization.data(withJSONObject: payload, options: [])
+        if let json = json {
+            let jsonString = String(data: json, encoding: .utf8) ?? "invalid"
+            print("\n========================================")
+            print("📤 WRITING CONFIG TO ESP32 CUSTOM \(targetCustom + 1)")
+            print("========================================")
+            print("JSON: \(jsonString)")
+            print("Config dict: \(config)")
+            print("Target Custom: \(targetCustom) (0=Custom1, 1=Custom2, 2=Custom3)")
+            print("========================================\n")
+            
+            peripheral.writeValue(json, for: char, type: .withResponse)
+            statusMessage = "Saving to Custom \(targetCustom + 1)..."
         } else {
             print("❌ Failed to serialize JSON")
             statusMessage = "⚠️ Failed to create config"
@@ -325,6 +358,11 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
                    let buttons = json["buttons"] as? [String: Int] {
                     DispatchQueue.main.async {
                         self.currentConfig = buttons
+                        // Extract currentCustom if provided (0 = Custom 1, 1 = Custom 2, 2 = Custom 3)
+                        if let custom = json["currentCustom"] as? Int {
+                            self.currentCustom = custom
+                            print("✓ Current custom preset: \(custom + 1)")
+                        }
                         self.statusMessage = "✓ Config loaded from device!"
                         print("✓ Parsed config: \(buttons)")
                     }
