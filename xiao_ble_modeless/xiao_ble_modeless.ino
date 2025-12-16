@@ -31,7 +31,7 @@
  * 4 = Redo (Cmd+Shift+Z)
  * 5 = Erase (E key)
  * 6 = Brush Size 5% ([ / ] keys)
- * 7 = Color Palette (Cmd+C)
+ * 7 = Color Palette (C key)
  * 8 = Brush Library (B key)
  * 9 = Brush Size 10% (Up+] / Down+[)
  */
@@ -255,9 +255,9 @@ void sendFunctionKey(int functionCode) {
     case 6:  // Brush Size 5%
       Serial.println("   → Brush Size 5%");
       return;
-    case 7:  // Color Palette (Cmd+C)
-      Serial.println("   → Color Palette (Cmd+C)");
-      modifier = 0x08;
+    case 7:  // Color Palette (C)
+      Serial.println("   → Color Palette (C)");
+      modifier = 0;
       key = 0x06;
       break;
     case 8:  // Brush Library (B)

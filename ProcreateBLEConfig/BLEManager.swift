@@ -20,6 +20,7 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
     private var scanTimer: Timer?
     private var noDevicesTimer: Timer?
     private var connectionTimeout: Timer?
+    private var configPollTimer: Timer?  // Auto-poll config to detect hardware switch changes
 
     override init() {
         super.init()
@@ -250,6 +251,9 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
         statusMessage = "✓ Connected! Discovering services..."
         print("✓ Connected to: \(peripheral.name ?? "Unknown")")
         peripheral.discoverServices(nil) // Discover all services
+        
+        // Start polling config every 2 seconds to detect hardware switch changes
+        startConfigPolling()
     }
     
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
@@ -261,6 +265,8 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
         isConnected = false
         configChar = nil  // Clear the characteristic
+        stopConfigPolling()  // Stop polling when disconnected
+        
         if let error = error {
             let errorMessage = error.localizedDescription
             print("🔌 Disconnected with error: \(errorMessage)")
@@ -391,5 +397,29 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
         scanTimer?.invalidate()
         noDevicesTimer?.invalidate()
         connectionTimeout?.invalidate()
+        configPollTimer?.invalidate()
+    }
+    
+    // MARK: - Config Polling
+    private func startConfigPolling() {
+        // Stop any existing timer
+        stopConfigPolling()
+        
+        // Poll config every 0.5 seconds to detect hardware switch changes instantly
+        configPollTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            self?.pollCurrentConfig()
+        }
+        print("🔄 Started config polling (every 0.5 seconds)")
+    }
+    
+    private func stopConfigPolling() {
+        configPollTimer?.invalidate()
+        configPollTimer = nil
+        print("⏹️ Stopped config polling")
+    }
+    
+    private func pollCurrentConfig() {
+        guard let char = configChar, let peripheral = targetPeripheral else { return }
+        peripheral.readValue(for: char)
     }
 }
