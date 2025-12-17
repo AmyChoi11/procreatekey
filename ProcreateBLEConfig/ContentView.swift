@@ -863,7 +863,7 @@ struct ContentView: View {
                         .frame(maxWidth: geometry.size.width * 0.5, alignment: .leading) // Max 50% of screen width, left aligned
                         .position(
                             x: scanButtonFrame.minX + (geometry.size.width * 0.25), // Align left edge with scan button
-                            y: geometry.size.height - 40 // 40pt from bottom
+                            y: geometry.size.height - 98 // 98pt from bottom
                         )
                     }
                 }
@@ -893,7 +893,7 @@ struct ContentView: View {
                     }
                     .padding(.trailing, 50)
                     .padding(.bottom, 100)
-                    .offset(y: -175)
+                    .offset(y: -160)
                 }
                 .padding(.top, 20)
                 
@@ -1512,6 +1512,13 @@ struct Button2FrameKey: PreferenceKey {
 }
 
 struct ScanButtonFrameKey: PreferenceKey {
+    static var defaultValue: CGRect = .zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        value = nextValue()
+    }
+}
+
+struct FramePreferenceKey: PreferenceKey {
     static var defaultValue: CGRect = .zero
     static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
         value = nextValue()
