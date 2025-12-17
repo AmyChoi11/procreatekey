@@ -227,6 +227,9 @@ class ConfigCallbacks : public BLECharacteristicCallbacks {
   }
 };
 
+// ============= Erase Toggle Tracking =============
+static int eraseButtonPressCount = 0;
+
 // ============= Keyboard Functions =============
 void sendFunctionKey(int functionCode) {
   if (!input || !deviceConnected) return;
@@ -247,11 +250,22 @@ void sendFunctionKey(int functionCode) {
       modifier = 0x0A;
       key = 0x1D;
       break;
-    case 5:  // Erase (E)
-      Serial.println("   → Erase (E)");
-      modifier = 0;
-      key = 0x08;
+    case 5: {  // Erase Toggle (E / B)
+      eraseButtonPressCount++;
+      
+      if (eraseButtonPressCount % 2 == 1) {
+        // Odd press - send E (erase mode)
+        Serial.println("   → Erase (E)");
+        modifier = 0;
+        key = 0x08;  // E key
+      } else {
+        // Even press - send B (brush mode)
+        Serial.println("   → Brush (B) - return to brush");
+        modifier = 0;
+        key = 0x05;  // B key
+      }
       break;
+    }
     case 6:  // Brush Size 5%
       Serial.println("   → Brush Size 5%");
       return;
