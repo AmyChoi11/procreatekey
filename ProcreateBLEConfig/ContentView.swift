@@ -98,6 +98,7 @@ struct ContentView: View {
     @State private var scrollFrame: CGRect = .zero
     @State private var comboFrame: CGRect = .zero
     @State private var scanButtonFrame: CGRect = .zero
+    @State private var clickScrollFrame: CGRect = .zero
     
     // State for showing dropdowns with anchor frames
     @State private var showScrollDropdown = false
@@ -248,72 +249,82 @@ struct ContentView: View {
                         button1Frame: button1Frame,
                         button2Frame: button2Frame,
                         scrollFrame: scrollFrame,
+                        clickScrollFrame: clickScrollFrame,
                         comboFrame: comboFrame
                     )
+                    .ignoresSafeArea(.container)
                 }
                 
+                // SINGLE SET OF POPUPS - positioned correctly
                 if showCustomRenameAlert {
-                    popupBackground {
-                        renameCustomPopup()
-                    }
+                    Color.black.opacity(0.4)
+                        .ignoresSafeArea()
+                        .overlay(
+                            renameCustomPopup()
+                                .padding(20)
+                        )
                 }
                 
                 if showSaveConfirmation {
-                    popupBackground {
-                        saveConfirmationPopup()
-                    }
+                    Color.black.opacity(0.4)
+                        .ignoresSafeArea()
+                        .overlay(
+                            saveConfirmationPopup()
+                                .padding(20)
+                        )
                 }
                 
                 if showSaveCustomDropdown {
-                    Color.clear
-                        .contentShape(Rectangle())
+                    Color.black.opacity(0.4)
+                        .ignoresSafeArea()
+                        .overlay(
+                            saveCustomDropdownView()
+                                .padding(20)
+                        )
                         .onTapGesture {
                             showSaveCustomDropdown = false
                         }
-                        .overlay(
-                            VStack(spacing: 0) {
-                                Text("Save Current Configuration")
-                                    .font(.headline)
-                                    .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
-                                    .padding()
-                                    .frame(maxWidth: .infinity)
-                                    .background(Color.gray.opacity(0.1))
-                                
-                                // Always show all 3 slots
-                                ForEach(1...3, id: \.self) { slot in
-                                    Button(action: {
-                                        customToSave = slot
-                                        showSaveConfirmation = true
-                                        showSaveCustomDropdown = false
-                                    }) {
-                                        HStack {
-                                            // Use custom name if it exists, otherwise "Custom X"
-                                            Text(getCustomNameForSlot(slot))
-                                                .font(.system(size: 16, weight: .semibold))
-                                                .foregroundColor(.black)
-                                            Spacer()
-                                        }
-                                        .padding()
-                                        .background(Color.white)
-                                    }
-                                    
-                                    if slot != 3 {
-                                        Divider()
-                                    }
-                                }
-                            }
-                            .background(Color.white)
-                            .cornerRadius(12)
-                            .shadow(radius: 5)
-                            .frame(width: 280)
-                            .position(
-                                x: UIScreen.main.bounds.width - 190,
-                                y: UIScreen.main.bounds.height + 50
-                            )
-                        )
                 }
             }
         }
+    }
+    
+    private func saveCustomDropdownView() -> some View {
+        VStack(spacing: 0) {
+            Text("Save Current Configuration")
+                .font(.headline)
+                .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                .padding()
+                .frame(maxWidth: .infinity)
+                .background(Color.gray.opacity(0.1))
+            
+            // Always show all 3 slots
+            ForEach(1...3, id: \.self) { slot in
+                Button(action: {
+                    customToSave = slot
+                    showSaveConfirmation = true
+                    showSaveCustomDropdown = false
+                }) {
+                    HStack {
+                        // Use custom name if it exists, otherwise "Custom X"
+                        Text(getCustomNameForSlot(slot))
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.black)
+                        Spacer()
+                    }
+                    .padding()
+                    .background(Color.white)
+                }
+                
+                if slot != 3 {
+                    Divider()
+                }
+            }
+        }
+        .background(Color.white)
+        .cornerRadius(12)
+        .shadow(radius: 5)
+        .frame(width: 280)
     }
     
     private func popupBackground<Content: View>(@ViewBuilder content: @escaping () -> Content) -> some View {
@@ -321,8 +332,7 @@ struct ContentView: View {
             .ignoresSafeArea()
             .overlay(
                 content()
-                    .position(x: UIScreen.main.bounds.width / 2,
-                              y: UIScreen.main.bounds.height / 2 + 180)
+                    .padding(20)
             )
     }
     
@@ -444,67 +454,6 @@ struct ContentView: View {
                     .navigationBarTitleTextColor(.white)
                     .navigationTitle("CliQ")
                     .navigationBarTitleDisplayMode(.inline)
-                
-                if showCustomRenameAlert {
-                    popupBackground {
-                        renameCustomPopup()
-                    }
-                }
-                
-                if showSaveConfirmation {
-                    popupBackground {
-                        saveConfirmationPopup()
-                    }
-                }
-                
-                if showSaveCustomDropdown {
-                    Color.clear
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            showSaveCustomDropdown = false
-                        }
-                        .overlay(
-                            VStack(spacing: 0) {
-                                Text("Save Current Configuration")
-                                    .font(.headline)
-                                    .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
-                                    .padding()
-                                    .frame(maxWidth: .infinity)
-                                    .background(Color.gray.opacity(0.1))
-                                
-                                // Always show all 3 slots
-                                ForEach(1...3, id: \.self) { slot in
-                                    Button(action: {
-                                        customToSave = slot
-                                        showSaveConfirmation = true
-                                        showSaveCustomDropdown = false
-                                    }) {
-                                        HStack {
-                                            // Use custom name if it exists, otherwise "Custom X"
-                                            Text(getCustomNameForSlot(slot))
-                                                .font(.system(size: 16, weight: .semibold))
-                                                .foregroundColor(.black)
-                                            Spacer()
-                                        }
-                                        .padding()
-                                        .background(Color.white)
-                                    }
-                                    
-                                    if slot != 3 {
-                                        Divider()
-                                    }
-                                }
-                            }
-                            .background(Color.white)
-                            .cornerRadius(12)
-                            .shadow(radius: 5)
-                            .frame(width: 280)
-                            .position(
-                                x: UIScreen.main.bounds.width - 190,
-                                y: UIScreen.main.bounds.height + 50
-                            )
-                        )
-                }
             }
             .navigationDestination(isPresented: $isShowingBluetoothView) {
                 BluetoothConnectionView(bleManager: bleManager)
@@ -801,6 +750,14 @@ struct ContentView: View {
                             }
                         }
                         .buttonStyle(PlainButtonStyle())
+                        .background(
+                            GeometryReader { geo in
+                                Color.clear.preference(key: FramePreferenceKey.self, value: geo.frame(in: .global))
+                            }
+                        )
+                        .onPreferenceChange(FramePreferenceKey.self) { frame in
+                            clickScrollFrame = frame
+                        }
                         .popover(isPresented: $showClickScrollDropdown,
                                  attachmentAnchor: .point(.bottom),
                                  arrowEdge: .top) {

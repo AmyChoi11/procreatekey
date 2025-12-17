@@ -9,6 +9,7 @@ struct InteractiveTutorialView: View {
     let button1Frame: CGRect
     let button2Frame: CGRect
     let scrollFrame: CGRect
+    let clickScrollFrame: CGRect
     let comboFrame: CGRect
     
     // Namespace for matched geometry
@@ -50,6 +51,13 @@ struct InteractiveTutorialView: View {
             title: "Configure Scroll Wheel",
             description: "Tap the scroll wheel (purple pill) to control brush size",
             highlightArea: .scroll,
+            systemIcon: nil,
+            actionRequired: true
+        ),
+        TutorialStep(
+            title: "Configure Click on Scroll",
+            description: "Tap the 'Click on Scroll' button to set what happens when you press down on the scroll wheel",
+            highlightArea: .clickScroll,
             systemIcon: nil,
             actionRequired: true
         ),
@@ -344,6 +352,19 @@ struct InteractiveTutorialView: View {
                 false
             )
             
+        case .clickScroll:
+            // Use actual clickScroll frame - it's a capsule/pill shape
+            let padding: CGFloat = 10
+            let localX = clickScrollFrame.midX - overlayOffset.x
+            let localY = clickScrollFrame.midY - overlayOffset.y
+            let width = clickScrollFrame.width + padding * 2
+            let height = clickScrollFrame.height + padding * 2
+            return (
+                CGPoint(x: localX - width / 2, y: localY - height / 2),
+                CGSize(width: width, height: height),
+                false
+            )
+            
         case .combo:
             // Use actual combo button frame
             let padding: CGFloat = 8
@@ -394,6 +415,7 @@ enum HighlightArea {
     case button1
     case button2
     case scroll
+    case clickScroll
     case combo
 }
 
@@ -407,6 +429,7 @@ struct InteractiveTutorialView_Previews: PreviewProvider {
             button1Frame: CGRect(x: 100, y: 300, width: 80, height: 80),
             button2Frame: CGRect(x: 250, y: 300, width: 80, height: 80),
             scrollFrame: CGRect(x: 180, y: 380, width: 60, height: 100),
+            clickScrollFrame: CGRect(x: 180, y: 500, width: 54, height: 90),
             comboFrame: CGRect(x: 20, y: 500, width: 350, height: 60)
         )
     }
