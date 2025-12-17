@@ -570,11 +570,11 @@ void loop() {
     bool bothPressed = btn1Low && btn2Low;
     unsigned long currentTime = millis();
     
-    // Track button press times
-    if (btn1Low && !button1Pressed) {
+    // Track button press times - ONLY SET ONCE on first press
+    if (btn1Low && !button1Pressed && button1PressTime == 0) {
       button1PressTime = currentTime;
     }
-    if (btn2Low && !button2Pressed) {
+    if (btn2Low && !button2Pressed && button2PressTime == 0) {
       button2PressTime = currentTime;
     }
     
@@ -596,7 +596,7 @@ void loop() {
       // Wait to see if button2 is also being pressed (combo detection)
       if (button1PressTime > 0 && (currentTime - button1PressTime >= COMBO_DETECTION_DELAY)) {
         // Check one more time if button2 is pressed
-        if (!digitalRead(BUTTON2_PIN) == LOW) {
+        if (digitalRead(BUTTON2_PIN) == HIGH) {
           Serial.println("🔘 BUTTON 1");
           button1Pressed = true;
           
@@ -618,7 +618,7 @@ void loop() {
       // Wait to see if button1 is also being pressed (combo detection)
       if (button2PressTime > 0 && (currentTime - button2PressTime >= COMBO_DETECTION_DELAY)) {
         // Check one more time if button1 is pressed
-        if (!digitalRead(BUTTON1_PIN) == LOW) {
+        if (digitalRead(BUTTON1_PIN) == HIGH) {
           Serial.println("🔘 BUTTON 2");
           button2Pressed = true;
           
