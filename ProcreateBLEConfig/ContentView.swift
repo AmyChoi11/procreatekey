@@ -125,9 +125,6 @@ struct ContentView: View {
     @State private var customsRefreshTrigger = false
     @State private var isShowingBluetoothView = false
     
-    // Track current custom number to detect hardware switch changes
-    @State private var lastKnownCustomNumber: Int = 0
-    
     // Track if any dropdown is currently shown
     private var isAnyDropdownShown: Bool {
         showScrollDropdown || showButton1Dropdown || showButton2Dropdown || 
@@ -482,23 +479,19 @@ struct ContentView: View {
             }
         }
         .onReceive(bleManager.$currentConfig) { newConfig in
-            // INTENTIONALLY DO NOTHING HERE
-            // Main screen is for free editing - don't auto-update from polling
-            // Only update when:
-            // 1. User selects from Saved Customs dropdown (handled in loadCustomToMainScreen)
-            // 2. Hardware switch changes (handled in onReceive bleManager.$currentCustom)
-        }
-        .onReceive(bleManager.$currentCustom) { customNumber in
-            // Hardware switch detected - update UI to show new custom's config
-            guard customNumber != lastKnownCustomNumber else {
+            // Don't update if a dropdown is currently shown - prevents popover interference
+            guard !isAnyDropdownShown else {
+                print("⏸️ Skipping config update - dropdown is shown")
                 return
             }
             
-            print("🔄 Hardware switch detected: Custom \(lastKnownCustomNumber + 1) → Custom \(customNumber + 1)")
-            lastKnownCustomNumber = customNumber
+            // Only update if config actually changed - prevents unnecessary view rebuilds
+            guard newConfig != self.config else {
+                return
+            }
             
-            // Update UI to match the new custom
-            self.config = bleManager.currentConfig
+            print("� Loading configuration from device: \(newConfig)")
+            self.config = newConfig
         }
     }
     
