@@ -11,6 +11,7 @@
 		A1000003 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000004 /* ContentView.swift */; };
 		A1000005 /* BLEManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000006 /* BLEManager.swift */; };
 		A1000017 /* InteractiveTutorialView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000018 /* InteractiveTutorialView.swift */; };
+		E936247C2EF25CB300B1E402 /* BluetoothConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E936247B2EF25CB300B1E402 /* BluetoothConnectionView.swift */; };
 		F1BDAAA42EC2841100F2AF4C /* FINAL_FIX_CONFIRMED.md in Resources */ = {isa = PBXBuildFile; fileRef = F1BDAAA02EC2841100F2AF4C /* FINAL_FIX_CONFIRMED.md */; };
 		F1BDAAA52EC2841100F2AF4C /* GIT_DEPLOYMENT.md in Resources */ = {isa = PBXBuildFile; fileRef = F1BDAAA12EC2841100F2AF4C /* GIT_DEPLOYMENT.md */; };
 		F1BDAAA62EC2841100F2AF4C /* DetectedProblem.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1BDAA9F2EC2841100F2AF4C /* DetectedProblem.swift */; };
@@ -25,6 +26,7 @@
 		A1000007 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = SOURCE_ROOT; };
 		A1000008 /* ProcreateBLEConfig.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ProcreateBLEConfig.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1000018 /* InteractiveTutorialView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractiveTutorialView.swift; sourceTree = "<group>"; };
+		E936247B2EF25CB300B1E402 /* BluetoothConnectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothConnectionView.swift; sourceTree = "<group>"; };
 		F1BDAA9F2EC2841100F2AF4C /* DetectedProblem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectedProblem.swift; sourceTree = "<group>"; };
 		F1BDAAA02EC2841100F2AF4C /* FINAL_FIX_CONFIRMED.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = FINAL_FIX_CONFIRMED.md; sourceTree = "<group>"; };
 		F1BDAAA12EC2841100F2AF4C /* GIT_DEPLOYMENT.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = GIT_DEPLOYMENT.md; sourceTree = "<group>"; };
@@ -56,6 +58,7 @@
 				A1000004 /* ContentView.swift */,
 				A1000006 /* BLEManager.swift */,
 				A1000007 /* Info.plist */,
+				E936247B2EF25CB300B1E402 /* BluetoothConnectionView.swift */,
 			);
 			name = ProcreateBLEConfig;
 			sourceTree = "<group>";
@@ -147,6 +150,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1000001 /* ProcreateBLEConfigApp.swift in Sources */,
+				E936247C2EF25CB300B1E402 /* BluetoothConnectionView.swift in Sources */,
 				F1BDAAA62EC2841100F2AF4C /* DetectedProblem.swift in Sources */,
 				F1BDAAA72EC2841100F2AF4C /* HelpView.swift in Sources */,
 				F1BDAAA82EC2841100F2AF4C /* OnboardingView.swift in Sources */,

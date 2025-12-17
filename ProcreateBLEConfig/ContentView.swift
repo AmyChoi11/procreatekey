@@ -1,29 +1,44 @@
 import SwiftUI
 import CoreBluetooth
 
-// MARK: - Status Notification View
 struct StatusNotificationView: View {
     let statusMessage: String
+    let isInitializing: Bool  // Add this parameter
     
     var body: some View {
-        let isSuccess = statusMessage.contains("✓") || statusMessage.contains("successfully")
+        let isSuccess = statusMessage.contains("✓") || statusMessage.contains("successfully") || statusMessage.contains("Connected") || statusMessage.contains("Reconnected")
         let isBluetoothReady = statusMessage.contains("Bluetooth ready")
+        let isReconnected = statusMessage.contains("Reconnected")
+        let isInitializingBluetooth = statusMessage.contains("Initializing Bluetooth") || isInitializing
         
         let iconName: String
         let iconColor: Color
         let backgroundColor: Color
         let borderColor: Color
         
-        if isSuccess {
-            iconName = "checkmark.circle.fill"
-            iconColor = .green
-            backgroundColor = Color.green.opacity(0.1)
-            borderColor = Color.green.opacity(0.2)
+        if isInitializingBluetooth {
+            // Initializing state - PASTEL YELLOW
+            iconName = "arrow.triangle.2.circlepath.circle"
+            iconColor = Color(red: 1.0, green: 0.85, blue: 0.4) // PASTEL YELLOW
+            backgroundColor = Color(red: 1.0, green: 0.85, blue: 0.4).opacity(0.1)
+            borderColor = Color(red: 1.0, green: 0.85, blue: 0.4).opacity(0.2)
+        } else if isSuccess {
+            if isReconnected {
+                iconName = "arrow.clockwise.circle.fill"
+                iconColor = .blue
+                backgroundColor = Color.blue.opacity(0.1)
+                borderColor = Color.blue.opacity(0.2)
+            } else {
+                iconName = "checkmark.circle.fill"
+                iconColor = .green
+                backgroundColor = Color.green.opacity(0.1)
+                borderColor = Color.green.opacity(0.2)
+            }
         } else if isBluetoothReady {
             iconName = "exclamationmark.circle.fill"
             iconColor = Color(red: 1.0, green: 0.85, blue: 0.4) // PASTEL YELLOW
-            backgroundColor = Color(red: 1.0, green: 0.85, blue: 0.4).opacity(0.1) // PASTEL YELLOW BACKGROUND
-            borderColor = Color(red: 1.0, green: 0.85, blue: 0.4).opacity(0.2) // PASTEL YELLOW BORDER
+            backgroundColor = Color(red: 1.0, green: 0.85, blue: 0.4).opacity(0.1)
+            borderColor = Color(red: 1.0, green: 0.85, blue: 0.4).opacity(0.2)
         } else {
             iconName = "xmark.circle.fill"
             iconColor = .red
@@ -38,7 +53,7 @@ struct StatusNotificationView: View {
             
             Text(statusMessage)
                 .font(.subheadline)
-                .foregroundColor(.black)
+                .foregroundColor(.white)
                 .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -102,6 +117,13 @@ struct ContentView: View {
     @State private var savedCustomName = ""
     @State private var customToSave: Int = 1
     
+    // Connection management
+    @State private var connectionCheckTimer: Timer?
+    
+    // Force UI refresh trigger
+    @State private var customsRefreshTrigger = false
+    @State private var isShowingBluetoothView = false
+
     // Preset system - RENAMED TO CUSTOMS
     @AppStorage("custom1") private var custom1Data: String = ""
     @AppStorage("custom2") private var custom2Data: String = ""
@@ -121,42 +143,7 @@ struct ContentView: View {
         let id: Int
         var name: String
         let config: [String: Int]
-    }
-    
-    // MARK: - Custom Functions - RENAMED FROM PRESET (MOVED BEFORE customs PROPERTY)
-    func loadCustom(from jsonString: String) -> [String: Int]? {
-        guard !jsonString.isEmpty,
-              let jsonData = jsonString.data(using: .utf8) else {
-            return nil
-        }
-        
-        do {
-            let config = try JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Int]
-            return config
-        } catch {
-            print("❌ Failed to load custom: \(error)")
-            return nil
-        }
-    }
-    
-    var customs: [Custom] {
-        var availableCustoms: [Custom] = []
-        
-        if let custom1 = loadCustom(from: custom1Data) {
-            let name = UserDefaults.standard.string(forKey: "custom1Name") ?? "Custom 1"
-            availableCustoms.append(Custom(id: 1, name: name, config: custom1))
-        }
-        
-        if let custom2 = loadCustom(from: custom2Data) {
-            let name = UserDefaults.standard.string(forKey: "custom2Name") ?? "Custom 2"
-            availableCustoms.append(Custom(id: 2, name: name, config: custom2))
-        }
-        
-        if let custom3 = loadCustom(from: custom3Data) {
-            let name = UserDefaults.standard.string(forKey: "custom3Name") ?? "Custom 3"
-            availableCustoms.append(Custom(id: 3, name: name, config: custom3))
-        }
-        return availableCustoms
+        var isActive: Bool = false
     }
     
     // DEFAULT CONFIGURATION
@@ -188,25 +175,67 @@ struct ContentView: View {
                     }
                     .onAppear {
                         handleOnAppear()
+                        startConnectionCheckTimer()
+                        
+                        // DEBUG: Check if image exists
+                        print("\n=== IMAGE DEBUG ===")
+                        
+                        // Test 1: Check with exact name
+                        if UIImage(named: "blackver") != nil {
+                            print("✅ UIImage(named: 'blackver') found the image")
+                        } else {
+                            print("❌ UIImage(named: 'blackver') returned nil")
+                        }
+                        
+                        // Test 2: Try with extension (sometimes needed for loose files)
+                        if UIImage(named: "blackver.png") != nil {
+                            print("✅ UIImage(named: 'blackver.png') found the image")
+                        } else {
+                            print("❌ UIImage(named: 'blackver.png') returned nil")
+                        }
+                        
+                        // Test 3: List all png files in bundle
+                        print("\n📁 Searching for png files in bundle...")
+                        if let resourcePath = Bundle.main.resourcePath {
+                            let enumerator = FileManager.default.enumerator(atPath: resourcePath)
+                            var foundpngs = [String]()
+                            
+                            while let file = enumerator?.nextObject() as? String {
+                                if file.lowercased().hasSuffix(".png") || file.lowercased().hasSuffix(".jpg") {
+                                    foundpngs.append(file)
+                                }
+                            }
+                            
+                            if foundpngs.isEmpty {
+                                print("   No png files found at all!")
+                            } else {
+                                print("   Found \(foundpngs.count) png file(s):")
+                                for file in foundpngs.sorted() {
+                                    print("   📄 \(file)")
+                                }
+                            }
+                        }
+                        print("=== END DEBUG ===\n")
+                    }
+                    .onDisappear {
+                        stopConnectionCheckTimer()
                     }
                     .onChange(of: scenePhase) { newPhase in
-                        switch newPhase {
-                        case .background:
-                            print("📱 App going to background, disconnecting...")
-                            if bleManager.isConnected {
-                                bleManager.disconnect()
-                            }
-                        case .inactive:
-                            print("📱 App inactive")
-                        case .active:
-                            print("📱 App active")
-                        @unknown default:
-                            break
-                        }
+                        handleScenePhaseChange(newPhase)
                     }
                     .onChange(of: bleManager.detectedProblem) { problem in
                         if problem != nil {
                             showHelp = true
+                        }
+                    }
+                    .onChange(of: bleManager.currentCustom) { newCustom in
+                        print("🔄 Active custom changed to: \(newCustom)")
+                        customsRefreshTrigger.toggle()
+                    }
+                    .onChange(of: bleManager.isConnected) { connected in
+                        if connected {
+                            print("✅ Connected - refreshing customs")
+                            customsRefreshTrigger.toggle()
                         }
                     }
                 
@@ -278,8 +307,8 @@ struct ContentView: View {
                             .shadow(radius: 5)
                             .frame(width: 280)
                             .position(
-                                x: UIScreen.main.bounds.width - 200, // Position near the right edge
-                                y: UIScreen.main.bounds.height - 200 // Position near the bottom
+                                x: UIScreen.main.bounds.width - 190,
+                                y: UIScreen.main.bounds.height + 50
                             )
                         )
                 }
@@ -292,7 +321,8 @@ struct ContentView: View {
             .ignoresSafeArea()
             .overlay(
                 content()
-                    .position(x: UIScreen.main.bounds.width / 2, y: UIScreen.main.bounds.height / 2)
+                    .position(x: UIScreen.main.bounds.width / 2,
+                              y: UIScreen.main.bounds.height / 2 + 180)
             )
     }
     
@@ -394,15 +424,92 @@ struct ContentView: View {
         )
     }
     
+    private func navigateToBluetoothView() {
+        isShowingBluetoothView = true
+    }
+    
     private var mainNavigationView: some View {
         NavigationStack {
-            mainContentView
-                .toolbar {
-                    toolbarContent
+            ZStack {
+                Color.clear
+                    .ignoresSafeArea()
+                
+                mainContentView
+                    .toolbar {
+                        toolbarContent
+                    }
+                    .toolbarBackground(Color(red: 0.4, green: 0.2, blue: 0.6), for: .navigationBar)
+                    .toolbarBackground(.visible, for: .navigationBar)
+                    .toolbarColorScheme(.dark, for: .navigationBar)
+                    .navigationBarTitleTextColor(.white)
+                    .navigationTitle("CliQ")
+                    .navigationBarTitleDisplayMode(.inline)
+                
+                if showCustomRenameAlert {
+                    popupBackground {
+                        renameCustomPopup()
+                    }
                 }
-                .toolbarBackground(Color(red: 0.4, green: 0.2, blue: 0.6), for: .navigationBar)
-                .toolbarBackground(.visible, for: .navigationBar)
-                .toolbarColorScheme(.dark, for: .navigationBar)
+                
+                if showSaveConfirmation {
+                    popupBackground {
+                        saveConfirmationPopup()
+                    }
+                }
+                
+                if showSaveCustomDropdown {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            showSaveCustomDropdown = false
+                        }
+                        .overlay(
+                            VStack(spacing: 0) {
+                                Text("Save Current Configuration")
+                                    .font(.headline)
+                                    .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                                    .padding()
+                                    .frame(maxWidth: .infinity)
+                                    .background(Color.gray.opacity(0.1))
+                                
+                                // Always show all 3 slots
+                                ForEach(1...3, id: \.self) { slot in
+                                    Button(action: {
+                                        customToSave = slot
+                                        showSaveConfirmation = true
+                                        showSaveCustomDropdown = false
+                                    }) {
+                                        HStack {
+                                            // Use custom name if it exists, otherwise "Custom X"
+                                            Text(getCustomNameForSlot(slot))
+                                                .font(.system(size: 16, weight: .semibold))
+                                                .foregroundColor(.black)
+                                            Spacer()
+                                        }
+                                        .padding()
+                                        .background(Color.white)
+                                    }
+                                    
+                                    if slot != 3 {
+                                        Divider()
+                                    }
+                                }
+                            }
+                            .background(Color.white)
+                            .cornerRadius(12)
+                            .shadow(radius: 5)
+                            .frame(width: 280)
+                            .position(
+                                x: UIScreen.main.bounds.width - 190,
+                                y: UIScreen.main.bounds.height + 50
+                            )
+                        )
+                }
+            }
+            .navigationDestination(isPresented: $isShowingBluetoothView) {
+                BluetoothConnectionView(bleManager: bleManager)
+                    .navigationBarBackButtonHidden(true)
+            }
         }
         .onReceive(bleManager.$isConnected) { connected in
             if connected {
@@ -417,11 +524,22 @@ struct ContentView: View {
     
     private var mainContentView: some View {
         ZStack {
-            // Background color - ADJUSTED LIGHT PURPLE (LESS SATURATED)
-            Color(red: 0.97, green: 0.94, blue: 1.0) // LIGHTER, LESS SATURATED PURPLE
-                .ignoresSafeArea()
+            // Background image - SIMPLIFIED VERSION
+            if let uiImage = UIImage(named: "blackver") ?? UIImage(named: "blackver.png") {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill() // Fills the space, maintains aspect ratio
+                    .frame(width: UIScreen.main.bounds.width) // Constrain width to screen
+                    .frame(maxHeight: .infinity) // Allow height to expand
+                    .clipped() // IMPORTANT: Cuts off excess
+                    .offset(y: 70) // Move down by x points
+                    .ignoresSafeArea()
+            } else {
+                // Fallback color if image not found
+                Color(red: 0.97, green: 0.94, blue: 1.0)
+                    .ignoresSafeArea()
+            }
             
-            // REMOVED ScrollView - replaced with fixed VStack
             VStack(spacing: 20) {
                 // Simulator warning
                 #if targetEnvironment(simulator)
@@ -448,67 +566,52 @@ struct ContentView: View {
                 
                 // Controller Diagram Section
                 VStack(spacing: 20) {
-                    Text("Controller Configuration")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.black) // BLACK TEXT
-                        .offset(y: 275) // MOVED DOWN BY 250
+                    // REMOVED: Text("Controller Configuration")
+                    // ADD: Spacer with same height as the text would have been
+                    Spacer()
+                        .frame(height: 20) // Approximate height of the title text with font .title2
                     
                     ZStack {
-                        // Controller outline first (bottom layer) - SCALED BY 1.5x AND MOVED UP BY 100
-                        controllerOutline
-                            .scaleEffect(controllerScale, anchor: .top) // Scale from top
-                            .offset(y: 150) // MOVED DOWN BY 250 (-100 + 250 = 150)
+                        Spacer()
+                            .frame(height: 150)
                         
                         connectionLines
-                            .offset(x: 0, y: 255)
+                            .offset(x: 0, y: 260)
                         
                         VStack(spacing: 30) {
                             HStack(spacing: 10) {
-                                // SCROLL AXIS CONFIG (top left)
+                                // MARK: - SCROLL AXIS CONFIG SECTION (updated)
                                 VStack(spacing: 8) {
                                     Button(action: {
                                         showScrollDropdown = true
                                     }) {
                                         Text(getCurrentSelection(for: "scroll"))
-                                            .font(.system(size: 16, weight: .medium))
-                                            .foregroundColor(.white) // WHITE TEXT
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 6)
-                                            .background(Color(red: 0.7, green: 0.5, blue: 0.9).opacity(0.8)) // PASTEL PURPLE BACKGROUND
-                                            .cornerRadius(6)
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 6)
-                                                    .stroke(Color.white, lineWidth: 1) // WHITE BORDER
-                                            )
+                                            .font(.system(size: 20, weight: .medium)) // Changed from 14 to 16
+                                            .foregroundColor(.white)
                                             .multilineTextAlignment(.center)
                                             .frame(width: 160, alignment: .center)
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
+                                        }
                                     
                                     Button(action: {
                                         showScrollDropdown = true
                                     }) {
                                         ZStack {
-                                            // Main pill-shaped body - PASTEL PURPLE FILL - SCALED BY 1.5x (RESTORE ORIGINAL SIZE)
                                             Capsule()
-                                                .fill(Color(red: 0.7, green: 0.5, blue: 0.9).opacity(0.8)) // PASTEL PURPLE FILL
-                                                .frame(width: 60 * buttonScale, height: 100 * buttonScale) // SCALED BY 1.5x
+                                                .fill(Color(red: 0.7, green: 0.5, blue: 0.9).opacity(0.8))
+                                                .frame(width: 60 * buttonScale, height: 100 * buttonScale)
                                             
-                                            // Outer border - WHITE OUTLINE
                                             Capsule()
                                                 .stroke(Color.white, lineWidth: 2)
-                                                .frame(width: 60 * buttonScale, height: 100 * buttonScale) // SCALED BY 1.5x
+                                                .frame(width: 60 * buttonScale, height: 100 * buttonScale)
                                             
-                                            // UP/DOWN ARROWS ADDED - WHITE - SCALED
                                             VStack(spacing: 4) {
                                                 Image(systemName: "chevron.up")
-                                                    .font(.system(size: 16 * buttonScale, weight: .bold)) // SCALED
-                                                    .foregroundColor(.white) // WHITE
+                                                    .font(.system(size: 16 * buttonScale, weight: .bold))
+                                                    .foregroundColor(.white)
                                                 
                                                 Image(systemName: "chevron.down")
-                                                    .font(.system(size: 16 * buttonScale, weight: .bold)) // SCALED
-                                                    .foregroundColor(.white) // WHITE
+                                                    .font(.system(size: 16 * buttonScale, weight: .bold))
+                                                    .foregroundColor(.white)
                                             }
                                         }
                                     }
@@ -519,83 +622,49 @@ struct ContentView: View {
                                     .onPreferenceChange(ScrollFrameKey.self) { frame in
                                         scrollFrame = frame
                                     }
-                                    
-                                    // Make the label clickable - PASTEL PURPLE TEXT - MOVED DOWN
-                                    Button(action: {
-                                        showScrollDropdown = true
-                                    }) {
-                                        Text("Scroll")
-                                            .font(.system(size: 16, weight: .semibold))
-                                            .foregroundColor(Color(red: 0.7, green: 0.5, blue: 0.9)) // PASTEL PURPLE TEXT
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
-                                    .padding(.top, 10) // MOVED DOWN BY 10 POINTS
-                                }
-                                .offset(x: -100, y: 205)
-                                .popover(isPresented: $showScrollDropdown, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
-                                    VStack(spacing: 0) {
-                                        ForEach(scrollOptions, id: \.self) { option in
-                                            Button(action: {
+                                    .popover(isPresented: $showScrollDropdown, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
+                                        dropdownContent(
+                                            options: scrollOptions,
+                                            selectedOption: getCurrentSelection(for: "scroll"),
+                                            onSelect: { option in
                                                 config["scroll"] = optionToCode(option)
                                                 saveConfigurationIfConnected()
                                                 showScrollDropdown = false
-                                            }) {
-                                                Text(option)
-                                                    .foregroundColor(.primary)
-                                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                                    .padding(.horizontal, 16)
-                                                    .padding(.vertical, 12)
                                             }
-                                            if option != scrollOptions.last {
-                                                Divider()
-                                            }
-                                        }
+                                        )
+                                        .frame(width: 200)
                                     }
-                                    .padding(.vertical, 8)
-                                    .background(Color.white)
-                                    .cornerRadius(12)
-                                    .shadow(radius: 5)
-                                    .frame(width: 200)
                                 }
-                                
-                                // Button 1 - Larger
+                                .offset(x: -100, y: 205)
+
+                                // Button 1
                                 VStack(spacing: 8) {
-                                    // INCREASED SIZE OF CURRENT CONFIG DISPLAY - NOW CLICKABLE
                                     Button(action: {
                                         showButton1Dropdown = true
                                     }) {
                                         Text(getCurrentSelection(for: "button1"))
-                                            .font(.system(size: 16, weight: .medium))
-                                            .foregroundColor(.white) // WHITE TEXT
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 6)
-                                            .background(Color(red: 0.85, green: 0.4, blue: 0.7).opacity(0.8)) // PASTEL RED-PURPLE BACKGROUND
-                                            .cornerRadius(6)
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 6)
-                                                    .stroke(Color.white, lineWidth: 1) // WHITE BORDER
-                                            )
+                                            .font(.system(size: 20, weight: .medium)) // Changed from 14 to 16
+                                            .foregroundColor(.white)
                                             .multilineTextAlignment(.center)
                                             .frame(width: 140, alignment: .center)
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
+                                            .offset(y: -15) // Move text up to align with scroll's text
+                                        }
                                     
-                                    // Circle button 1 visual
                                     Button(action: {
                                         showButton1Dropdown = true
                                     }) {
                                         ZStack {
                                             Circle()
-                                                .fill(Color(red: 0.85, green: 0.4, blue: 0.7).opacity(0.8)) // PASTEL RED-PURPLE BACKGROUND
-                                                .frame(width: 80 * buttonScale, height: 80 * buttonScale) // SCALED BY 1.5x
+                                                .fill(Color(red: 0.85, green: 0.4, blue: 0.7).opacity(0.8))
+                                                .frame(width: 80 * buttonScale, height: 80 * buttonScale)
                                             
                                             Circle()
-                                                .stroke(Color.white, lineWidth: 2) // WHITE BORDER
-                                                .frame(width: 80 * buttonScale, height: 80 * buttonScale) // SCALED BY 1.5x
+                                                .stroke(Color.white, lineWidth: 2)
+                                                .frame(width: 80 * buttonScale, height: 80 * buttonScale)
                                             
                                             Text("1")
-                                                .font(.system(size: 24 * buttonScale, weight: .bold)) // SCALED
-                                                .foregroundColor(.white) // WHITE TEXT
+                                                .font(.system(size: 24 * buttonScale, weight: .bold))
+                                                .foregroundColor(.white)
                                         }
                                     }
                                     .buttonStyle(PlainButtonStyle())
@@ -605,81 +674,49 @@ struct ContentView: View {
                                     .onPreferenceChange(ViewFrameKey.self) { frame in
                                         button1Frame = frame
                                     }
-                                    
-                                    // Label
-                                    Button(action: {
-                                        showButton1Dropdown = true
-                                    }) {
-                                        Text("Button 1")
-                                            .font(.system(size: 16, weight: .semibold))
-                                            .foregroundColor(Color(red: 0.85, green: 0.4, blue: 0.7)) // PASTEL RED-PURPLE TEXT
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
-                                    .padding(.top, 10)
-                                }
-                                .offset(y: 205)
-                                .popover(isPresented: $showButton1Dropdown, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
-                                    VStack(spacing: 0) {
-                                        ForEach(circleButton1Options, id: \.self) { option in
-                                            Button(action: {
+                                    .popover(isPresented: $showButton1Dropdown, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
+                                        dropdownContent(
+                                            options: circleButton1Options,
+                                            selectedOption: getCurrentSelection(for: "button1"),
+                                            onSelect: { option in
                                                 config["button1"] = optionToCode(option)
                                                 saveConfigurationIfConnected()
                                                 showButton1Dropdown = false
-                                            }) {
-                                                Text(option)
-                                                    .foregroundColor(.primary)
-                                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                                    .padding(.horizontal, 16)
-                                                    .padding(.vertical, 12)
                                             }
-                                            if option != circleButton1Options.last {
-                                                Divider()
-                                            }
-                                        }
+                                        )
+                                        .frame(width: 150)
                                     }
-                                    .padding(.vertical, 8)
-                                    .background(Color.white)
-                                    .cornerRadius(12)
-                                    .shadow(radius: 5)
-                                    .frame(width: 150)
                                 }
-                                
-                                // Button 2 - Larger
+                                .offset(y: 205)
+
+                                // MARK: - BUTTON 2 SECTION (updated)
                                 VStack(spacing: 8) {
                                     Button(action: {
                                         showButton2Dropdown = true
                                     }) {
                                         Text(getCurrentSelection(for: "button2"))
-                                            .font(.system(size: 16, weight: .medium))
-                                            .foregroundColor(.white) // WHITE TEXT
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 6)
-                                            .background(Color(red: 0.5, green: 0.4, blue: 0.9).opacity(0.8)) // PASTEL BLUE-PURPLE BACKGROUND
-                                            .cornerRadius(6)
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 6)
-                                                    .stroke(Color.white, lineWidth: 1) // WHITE BORDER
-                                            )
+                                            .font(.system(size: 20, weight: .medium)) // Changed from 14 to 16
+                                            .foregroundColor(.white)
                                             .multilineTextAlignment(.center)
                                             .frame(width: 140, alignment: .center)
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
+                                            .offset(y: -15) // Move text up to align with scroll's text
+                                        }
                                     
                                     Button(action: {
                                         showButton2Dropdown = true
                                     }) {
                                         ZStack {
                                             Circle()
-                                                .fill(Color(red: 0.5, green: 0.4, blue: 0.9).opacity(0.8)) // PASTEL BLUE-PURPLE BACKGROUND
-                                                .frame(width: 80 * buttonScale, height: 80 * buttonScale) // SCALED BY 1.5x
+                                                .fill(Color(red: 0.5, green: 0.4, blue: 0.9).opacity(0.8))
+                                                .frame(width: 80 * buttonScale, height: 80 * buttonScale)
                                             
                                             Circle()
-                                                .stroke(Color.white, lineWidth: 2) // WHITE BORDER
-                                                .frame(width: 80 * buttonScale, height: 80 * buttonScale) // SCALED BY 1.5x
+                                                .stroke(Color.white, lineWidth: 2)
+                                                .frame(width: 80 * buttonScale, height: 80 * buttonScale)
                                             
                                             Text("2")
-                                                .font(.system(size: 24 * buttonScale, weight: .bold)) // SCALED
-                                                .foregroundColor(.white) // WHITE TEXT
+                                                .font(.system(size: 24 * buttonScale, weight: .bold))
+                                                .foregroundColor(.white)
                                         }
                                     }
                                     .buttonStyle(PlainButtonStyle())
@@ -689,190 +726,108 @@ struct ContentView: View {
                                     .onPreferenceChange(Button2FrameKey.self) { frame in
                                         button2Frame = frame
                                     }
-                                    
-                                    Button(action: {
-                                        showButton2Dropdown = true
-                                    }) {
-                                        Text("Button 2")
-                                            .font(.system(size: 16, weight: .semibold))
-                                            .foregroundColor(Color(red: 0.5, green: 0.4, blue: 0.9)) // PASTEL BLUE-PURPLE TEXT
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
-                                    .padding(.top, 10)
-                                }
-                                .offset(x: 100, y: 205)
-                                .popover(isPresented: $showButton2Dropdown, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
-                                    VStack(spacing: 0) {
-                                        ForEach(circleButton2Options, id: \.self) { option in
-                                            Button(action: {
+                                    .popover(isPresented: $showButton2Dropdown, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
+                                        dropdownContent(
+                                            options: circleButton2Options,
+                                            selectedOption: getCurrentSelection(for: "button2"),
+                                            onSelect: { option in
                                                 config["button2"] = optionToCode(option)
                                                 saveConfigurationIfConnected()
                                                 showButton2Dropdown = false
-                                            }) {
-                                                Text(option)
-                                                    .foregroundColor(.primary)
-                                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                                    .padding(.horizontal, 16)
-                                                    .padding(.vertical, 12)
                                             }
-                                            if option != circleButton2Options.last {
-                                                Divider()
-                                            }
-                                        }
+                                        )
+                                        .frame(width: 150)
                                     }
-                                    .padding(.vertical, 8)
-                                    .background(Color.white)
-                                    .cornerRadius(12)
-                                    .shadow(radius: 5)
-                                    .frame(width: 150)
                                 }
+                                .offset(x: 100, y: 205)
                             }
                             .padding(.top, 20)
                         }
-                        .frame(height: 320 * controllerScale) // SCALED HEIGHT
+                        .frame(height: 320 * controllerScale)
                     }
                 }
                 .padding(.top, 15)
                 .padding(.horizontal)
                 
-                // VERTICAL ARROW + CLICK ON SCROLL
                 VStack(spacing: 0) {
-                    // VERTICAL ARROW POINTING UP - HALVED LENGTH
-                    GeometryReader { geometry in
+                    // VERTICAL ARROW
+                    VStack(spacing: 0) {
+                        // Simple arrow that just points down from its container
                         ZStack {
-                            // Calculate position for the vertical arrow (centered above click scroll button)
-                            let clickScrollCenterX = geometry.size.width / 2 - 250 // Same X as click scroll
-                            let clickScrollTopY = (geometry.size.height / 2) - (100 * buttonScale * 0.3) + 15
-                            
-                            let arrowY = clickScrollTopY - 60 + 120
-                            
-                            // Vertical line
+                            // Draw the arrow line (20 points long)
                             Path { path in
-                                let arrowLength: CGFloat = 30
-                                path.move(to: CGPoint(x: clickScrollCenterX, y: arrowY + arrowLength))
-                                path.addLine(to: CGPoint(x: clickScrollCenterX, y: arrowY))
+                                path.move(to: CGPoint(x: 0, y: 20)) // Start at bottom
+                                path.addLine(to: CGPoint(x: 0, y: 0)) // Go to top
                             }
-                            .stroke(Color(red: 0.4, green: 0.2, blue: 0.6),
-                                    style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                            
-                            // Arrow head
-                            Path { path in
-                                let arrowSize: CGFloat = 8
-                                path.move(to: CGPoint(x: clickScrollCenterX, y: arrowY))
-                                path.addLine(to: CGPoint(x: clickScrollCenterX - arrowSize, y: arrowY + arrowSize))
-                                path.move(to: CGPoint(x: clickScrollCenterX, y: arrowY))
-                                path.addLine(to: CGPoint(x: clickScrollCenterX + arrowSize, y: arrowY + arrowSize))
-                            }
-                            .stroke(Color(red: 0.4, green: 0.2, blue: 0.6),
+                            .stroke(Color.white,
                                     style: StrokeStyle(lineWidth: 2, lineCap: .round))
                         }
+                        .frame(width: 1, height: 30) // Just enough for the arrow
                     }
-                    
-                    VStack(spacing: 8) {
-                        // Config display for the click scroll button (uses button3)
+                    .frame(width: 1, height: 30)
+                    .offset(x: -250, y: 50)
+
+                    // CLICK ON SCROLL CONFIG DISPLAY
+                    VStack(spacing: 10) {
                         Button(action: {
                             showClickScrollDropdown = true
                         }) {
                             Text(getCurrentSelection(for: "button3"))
-                                .font(.system(size: 10, weight: .medium))
+                                .font(.system(size: 20, weight: .medium)) // Changed back to 20
                                 .foregroundColor(.white)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 3)
-                                .background(Color(red: 0.7, green: 0.5, blue: 0.8))
-                                .cornerRadius(4)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 4)
-                                        .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), lineWidth: 2)
-                                )
+                                .multilineTextAlignment(.center)
+                                .frame(width: 160, alignment: .center)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
-                        .buttonStyle(PlainButtonStyle())
                         
-                        // Click scroll button with finger-clicking symbol
                         Button(action: {
                             showClickScrollDropdown = true
                         }) {
                             ZStack {
                                 Capsule()
-                                    .fill(Color(red: 0.7, green: 0.5, blue: 0.8))
-                                    .frame(width: 36, height: 60)
+                                    .fill(Color(red: 0.7, green: 0.5, blue: 0.9).opacity(0.8))
+                                    .frame(width: 54, height: 90)
                                 
                                 Capsule()
-                                    .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), lineWidth: 2)
-                                    .frame(width: 36, height: 60)
+                                    .stroke(Color.white, lineWidth: 2)
+                                    .frame(width: 54, height: 90)
                                 
                                 VStack(spacing: 2) {
                                     Image(systemName: "hand.tap.fill")
-                                        .font(.system(size: 12, weight: .bold))
+                                        .font(.system(size: 20, weight: .bold))
                                         .foregroundColor(.white)
                                         .padding(.top, 4)
-                                    
-                                    Circle()
-                                        .fill(Color.white.opacity(0.3))
-                                        .frame(width: 8, height: 8)
-                                        .offset(y: 2)
                                 }
                             }
                         }
                         .buttonStyle(PlainButtonStyle())
-                        
-                        Button(action: {
-                            showClickScrollDropdown = true
-                        }) {
-                            Text("Click on Scroll")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(Color(red: 0.7, green: 0.5, blue: 0.8))
-
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                    }
-                    .offset(x: -250, y: 25)
-                    .popover(isPresented: $showClickScrollDropdown,
-                             attachmentAnchor: .point(.bottom),
-                             arrowEdge: .top) {
-                        VStack(spacing: 0) {
-                            ForEach(circleButton1Options, id: \.self) { option in
-                                Button(action: {
+                        .popover(isPresented: $showClickScrollDropdown,
+                                 attachmentAnchor: .point(.bottom),
+                                 arrowEdge: .top) {
+                            dropdownContent(
+                                options: circleButton1Options,
+                                selectedOption: getCurrentSelection(for: "button3"),
+                                onSelect: { option in
                                     config["button3"] = optionToCode(option)
                                     saveConfigurationIfConnected()
                                     showClickScrollDropdown = false
-                                }) {
-                                    Text(option)
-                                        .foregroundColor(.primary)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 12)
                                 }
-                                if option != circleButton1Options.last {
-                                    Divider()
-                                }
-                            }
+                            )
+                            .frame(width: 200)
                         }
-                        .padding(.vertical, 8)
-                        .background(Color.white)
-                        .cornerRadius(12)
-                        .shadow(radius: 5)
-                        .frame(width: 200)
                     }
+                    .offset(x: -250, y: 60)
                 }
-                .frame(height: 200)
+                .frame(height: 200) // Keep same total height as before
                 
-                // Buttons 1+2 combo config
-                VStack(spacing: 8) {
+                // Combo Button - Already has correct structure
+                VStack(spacing: 15) {
                     Button(action: {
                         showComboDropdown = true
                     }) {
                         Text(getCurrentSelection(for: "combo"))
-                            .font(.system(size: 16, weight: .medium))
+                            .font(.system(size: 20, weight: .medium))
                             .foregroundColor(.white)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(Color(red: 0.7, green: 0.5, blue: 0.8))
-                            .cornerRadius(6)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), lineWidth: 2)
-                            )
                             .multilineTextAlignment(.center)
                             .frame(width: 160, alignment: .center)
                     }
@@ -881,47 +836,39 @@ struct ContentView: View {
                     Button(action: {
                         showComboDropdown = true
                     }) {
-                        HStack(spacing: 6) {
+                        HStack(spacing: 10) {
                             ZStack {
                                 Circle()
                                     .fill(Color(red: 0.85, green: 0.4, blue: 0.7).opacity(0.8))
-                                    .frame(width: 28, height: 28)
+                                    .frame(width: 50, height: 50)
                                 
                                 Circle()
                                     .stroke(Color.white, lineWidth: 1)
-                                    .frame(width: 28, height: 28)
+                                    .frame(width: 50, height: 50)
                                 
                                 Text("1")
-                                    .font(.system(size: 12, weight: .bold))
+                                    .font(.system(size: 20, weight: .bold))
                                     .foregroundColor(.white)
                             }
                             
                             Text("+")
-                                .font(.system(size: 16, weight: .bold))
+                                .font(.system(size: 20, weight: .bold))
                                 .foregroundColor(.white)
                             
                             ZStack {
                                 Circle()
                                     .fill(Color(red: 0.5, green: 0.4, blue: 0.9).opacity(0.8))
-                                    .frame(width: 28, height: 28)
+                                    .frame(width: 50, height: 50)
                                 
                                 Circle()
                                     .stroke(Color.white, lineWidth: 1)
-                                    .frame(width: 28, height: 28)
+                                    .frame(width: 50, height: 50)
                                 
                                 Text("2")
-                                    .font(.system(size: 12, weight: .bold))
+                                    .font(.system(size: 20, weight: .bold))
                                     .foregroundColor(.white)
                             }
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .background(Color(red: 0.7, green: 0.5, blue: 0.8))
-                        .cornerRadius(8)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), lineWidth: 2)
-                        )
                     }
                     .buttonStyle(PlainButtonStyle())
                     .background(GeometryReader { geo in
@@ -930,90 +877,31 @@ struct ContentView: View {
                     .onPreferenceChange(ComboFrameKey.self) { frame in
                         comboFrame = frame
                     }
-                }
-                .offset(x: 130, y: -95)
-                .popover(isPresented: $showComboDropdown,
-                         attachmentAnchor: .point(.bottom),
-                         arrowEdge: .top) {
-                    VStack(spacing: 0) {
-                        ForEach(buttons12Options, id: \.self) { option in
-                            Button(action: {
+                    .popover(isPresented: $showComboDropdown,
+                             attachmentAnchor: .point(.bottom),
+                             arrowEdge: .top) {
+                        dropdownContent(
+                            options: buttons12Options,
+                            selectedOption: getCurrentSelection(for: "combo"),
+                            onSelect: { option in
                                 config["combo"] = optionToCode(option)
                                 saveConfigurationIfConnected()
                                 showComboDropdown = false
-                            }) {
-                                Text(option)
-                                    .foregroundColor(.primary)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 12)
                             }
-                            if option != buttons12Options.last {
-                                Divider()
-                            }
-                        }
+                        )
+                        .frame(width: 180)
                     }
-                    .padding(.vertical, 8)
-                    .background(Color.white)
-                    .cornerRadius(12)
-                    .shadow(radius: 5)
-                    .frame(width: 180)
-                    .presentationCompactAdaptation(.popover)
                 }
-                
-                if bleManager.isConnected {
-                    VStack(spacing: 12) {
-                        // Active Custom Indicator
-                        VStack(spacing: 8) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "dial.max.fill")
-                                    .font(.system(size: 20))
-                                    .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
-                                Text("Hardware Switch Position: Custom \(bleManager.currentCustom + 1)")
-                                    .font(.system(size: 15, weight: .semibold))
-                                    .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
-                            }
-                            
-                            Text("Any changes you make will be saved to Custom \(bleManager.currentCustom + 1). Move the 3-position switch on your device to switch between Custom 1, Custom 2, and Custom 3.")
-                                .font(.caption)
-                                .multilineTextAlignment(.center)
-                                .foregroundColor(.secondary)
-                                .padding(.horizontal, 8)
-                        }
-                        .padding()
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.green.opacity(0.1))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.green.opacity(0.3), lineWidth: 2)
-                        )
-                        
-                        VStack(spacing: 8) {
-                            Image(systemName: "info.circle.fill")
-                                .font(.system(size: 24))
-                                .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
-                            Text("⚠️ While connected, do NOT press the RESET button on the device. It will disconnect and restart.")
-                                .font(.caption)
-                                .multilineTextAlignment(.center)
-                                .foregroundColor(.black)
-                        }
-                        .padding()
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color(red: 0.4, green: 0.2, blue: 0.6).opacity(0.1))
-                        )
-                    }
-                    .padding(.horizontal)
-                    .padding(.top, 30)
-                }
+                .offset(x: 130, y: -105)
                 
                 Spacer().frame(height: 30)
                 
                 if !bleManager.statusMessage.isEmpty {
-                    StatusNotificationView(statusMessage: bleManager.statusMessage)
-                        .offset(y: -90)
+                    StatusNotificationView(
+                        statusMessage: bleManager.statusMessage,
+                        isInitializing: bleManager.isInitializing
+                    )
+                    .offset(x: -400, y: -90)
                 }
                 
                 // Save Custom Button
@@ -1039,9 +927,9 @@ struct ContentView: View {
                                 .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), lineWidth: 2)
                         )
                     }
-                    .padding(.trailing, 80)
+                    .padding(.trailing, 50)
                     .padding(.bottom, 100)
-                    .offset(y: -300)
+                    .offset(y: -175)
                 }
                 .padding(.top, 20)
                 
@@ -1050,46 +938,63 @@ struct ContentView: View {
             .padding(.vertical)
             .padding(.bottom, 30)
         }
-        .navigationTitle("eSketch Shortcuts")
-        .navigationBarTitleDisplayMode(.inline)
+    }
+    
+    // MARK: - Dropdown Content Helper (Scrollable Version)
+    private func dropdownContent(options: [String], selectedOption: String, onSelect: @escaping (String) -> Void) -> some View {
+        VStack(spacing: 0) {
+            // Add a scroll view with fixed height
+            ScrollView {
+                VStack(spacing: 0) {
+                    ForEach(options, id: \.self) { option in
+                        Button(action: {
+                            onSelect(option)
+                        }) {
+                            HStack {
+                                Text(option)
+                                    .foregroundColor(.primary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.vertical, 12)
+                                
+                                if option == selectedOption {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(.blue)
+                                        .padding(.trailing, 8)
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .frame(height: 44) // Fixed height for each option
+                            .contentShape(Rectangle()) // Makes entire area tappable
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        
+                        if option != options.last {
+                            Divider()
+                        }
+                    }
+                }
+            }
+            .frame(maxHeight: min(CGFloat(options.count) * 44, 300)) // Max height of 300 points
+        }
+        .padding(.vertical, 8)
+        .background(Color.white)
+        .cornerRadius(12)
+        .shadow(radius: 5)
     }
     
     @ToolbarContentBuilder
     var toolbarContent: some ToolbarContent {
-        // Left toolbar - Bluetooth Scan/Connect button styled like Customs
+        // Left toolbar - Bluetooth and Help buttons
         ToolbarItem(placement: .navigationBarLeading) {
             HStack(spacing: 10) {
                 Button(action: {
-                    if bleManager.isConnected {
-                        bleManager.disconnect()
-                    } else if !bleManager.isScanning {
-                        bleManager.startScan()
-                        showDeviceSheet = true
-                    }
+                    isShowingBluetoothView = true
                 }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "dot.radiowaves.left.and.right")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(bleManager.isConnected ? Color.green : Color(red: 0.4, green: 0.2, blue: 0.6))
-                        Text(bleManager.isConnected ? "Connected" : "Scan")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(bleManager.isConnected ? Color.green : Color(red: 0.4, green: 0.2, blue: 0.6))
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color.white.opacity(0.9))
-                    .cornerRadius(8)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(
-                                bleManager.isConnected
-                                ? Color.green.opacity(0.6)
-                                : Color(red: 0.4, green: 0.2, blue: 0.6).opacity(0.6),
-                                lineWidth: 1.5
-                            )
-                    )
+                    Image(systemName: bluetoothIconName)
+                        .foregroundColor(.white)
+                        .font(.system(size: 18))
                 }
-                .disabled(bleManager.isScanning)
                 .overlay(
                     GeometryReader { geo in
                         Color.clear.preference(key: ScanButtonFrameKey.self, value: geo.frame(in: .global))
@@ -1125,19 +1030,16 @@ struct ContentView: View {
                     Text("Reset to Default")
                         .font(.system(size: 15, weight: .semibold))
                 }
-                .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                .foregroundColor(.white)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(Color.white.opacity(0.9))
-                .cornerRadius(8)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color(red: 0.4, green: 0.2, blue: 0.6).opacity(0.6), lineWidth: 1.5)
-                )
             }
             
             Button(action: {
                 showCustomsDropdown = true
+                if bleManager.isConnected {
+                    customsRefreshTrigger.toggle()
+                }
             }) {
                 HStack(spacing: 6) {
                     Image(systemName: "list.bullet")
@@ -1145,15 +1047,9 @@ struct ContentView: View {
                     Text("Customs")
                         .font(.system(size: 15, weight: .semibold))
                 }
-                .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                .foregroundColor(.white)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(Color.white.opacity(0.9))
-                .cornerRadius(8)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color(red: 0.4, green: 0.2, blue: 0.6).opacity(0.6), lineWidth: 1.5)
-                )
             }
             .popover(isPresented: $showCustomsDropdown,
                      attachmentAnchor: .point(.bottom),
@@ -1162,50 +1058,21 @@ struct ContentView: View {
             }
         }
     }
-    
-    // MARK: - Save Custom Menu View
-    var saveCustomMenuView: some View {
-        VStack(spacing: 0) {
-            Text("Save Current Configuration")
-                .font(.headline)
-                .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
-                .padding()
-                .frame(maxWidth: .infinity)
-                .background(Color.gray.opacity(0.1))
-            
-            ForEach(1...3, id: \.self) { slot in
-                Button(action: {
-                    customToSave = slot
-                    showSaveConfirmation = true
-                    showSaveCustomDropdown = false
-                }) {
-                    HStack {
-                        Text(getCustomNameForSlot(slot))
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.black)
-                        Spacer()
-                    }
-                    .padding()
-                    .background(Color.white)
-                }
-                
-                if slot != 3 {
-                    Divider()
-                }
-            }
+
+    private var bluetoothIconName: String {
+        if bleManager.isConnected {
+            return "dot.radiowaves.left.and.right.circle.fill"
+        } else if bleManager.isScanning {
+            return "dot.radiowaves.left.and.right.circle"
+        } else {
+            return "dot.radiowaves.left.and.right"
         }
-        .background(Color.white)
-        .cornerRadius(12)
-        .shadow(radius: 5)
-        .frame(width: 280)
     }
     
-    // MARK: - Lifecycle Methods
     func handleOnAppear() {
         print("📱 ContentView appeared")
         print("📱 hasCompletedOnboarding: \(hasCompletedOnboarding)")
         print("📱 showInteractiveTutorial: \(showInteractiveTutorial)")
-        print("📱 showDeviceSheet: \(showDeviceSheet)")
         
         if !hasCompletedOnboarding {
             print("📱 🎓 Showing interactive tutorial for first time!")
@@ -1214,15 +1081,58 @@ struct ContentView: View {
                 print("📱 ✅ showInteractiveTutorial set to true")
             }
         } else {
-            if !hasShownInitialSheet && !bleManager.isConnected {
-                hasShownInitialSheet = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    bleManager.startScan()
-                    showDeviceSheet = true
-                    print("📱 📡 Device sheet shown")
-                }
+            // This only runs AFTER onboarding/tutorial is completed
+            print("📱 Onboarding/tutorial completed")
+            
+            // Check if we should automatically show Bluetooth view
+            let shouldAutoShowBluetooth = UserDefaults.standard.bool(forKey: "shouldAutoShowBluetoothAfterOnboarding")
+            
+            if !bleManager.isConnected && shouldAutoShowBluetooth {
+                print("📱 First launch after onboarding - showing Bluetooth view automatically")
+                isShowingBluetoothView = true
+                // Reset the flag so we don't show it again
+                UserDefaults.standard.set(false, forKey: "shouldAutoShowBluetoothAfterOnboarding")
             }
         }
+    }
+    
+    private func handleScenePhaseChange(_ newPhase: ScenePhase) {
+        switch newPhase {
+        case .background:
+            print("📱 App going to background")
+            // BLE manager handles this via notifications
+            
+        case .inactive:
+            print("📱 App inactive")
+            
+        case .active:
+            print("📱 App active")
+            // BLE manager handles this via notifications
+            // Just refresh our UI state
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                if self.bleManager.isConnected {
+                    self.customsRefreshTrigger.toggle()
+                }
+            }
+            
+        @unknown default:
+            break
+        }
+    }
+    
+    private func startConnectionCheckTimer() {
+        stopConnectionCheckTimer()
+        
+        connectionCheckTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
+            if self.bleManager.isConnected {
+                self.bleManager.verifyConnection()
+            }
+        }
+    }
+    
+    private func stopConnectionCheckTimer() {
+        connectionCheckTimer?.invalidate()
+        connectionCheckTimer = nil
     }
     
     // MARK: - Reset to Default
@@ -1232,9 +1142,52 @@ struct ContentView: View {
         print("🔄 Reset to default configuration: \(defaultConfig)")
     }
     
+    // MARK: - Helper Functions
+    func loadConfigFromJSON(_ jsonString: String) -> [String: Int]? {
+        guard !jsonString.isEmpty,
+              let jsonData = jsonString.data(using: .utf8) else {
+            return nil
+        }
+        
+        do {
+            let config = try JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Int]
+            return config
+        } catch {
+            print("❌ Failed to load custom: \(error)")
+            return nil
+        }
+    }
+    
+    var customs: [Custom] {
+        _ = customsRefreshTrigger
+        
+        var availableCustoms: [Custom] = []
+        
+        if let custom1Config = loadConfigFromJSON(custom1Data) {
+            let name = UserDefaults.standard.string(forKey: "custom1Name") ?? "Custom 1"
+            let isActive = bleManager.isConnected && bleManager.currentCustom == 0
+            availableCustoms.append(Custom(id: 1, name: name, config: custom1Config, isActive: isActive))
+        }
+        
+        if let custom2Config = loadConfigFromJSON(custom2Data) {
+            let name = UserDefaults.standard.string(forKey: "custom2Name") ?? "Custom 2"
+            let isActive = bleManager.isConnected && bleManager.currentCustom == 1
+            availableCustoms.append(Custom(id: 2, name: name, config: custom2Config, isActive: isActive))
+        }
+        
+        if let custom3Config = loadConfigFromJSON(custom3Data) {
+            let name = UserDefaults.standard.string(forKey: "custom3Name") ?? "Custom 3"
+            let isActive = bleManager.isConnected && bleManager.currentCustom == 2
+            availableCustoms.append(Custom(id: 3, name: name, config: custom3Config, isActive: isActive))
+        }
+        return availableCustoms
+    }
+    
     // MARK: - Custom Menu View
     var customMenuView: some View {
-        VStack(spacing: 0) {
+        let _ = customsRefreshTrigger
+        
+        return VStack(spacing: 0) {
             Text("Saved Customs")
                 .font(.headline)
                 .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
@@ -1254,9 +1207,26 @@ struct ContentView: View {
                             showCustomsDropdown = false
                         }) {
                             VStack(alignment: .leading, spacing: 8) {
-                                Text(custom.name)
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundColor(.black)
+                                HStack(spacing: 6) {
+                                    Text(custom.name)
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundColor(.black)
+                                    
+                                    if custom.isActive && bleManager.isConnected {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .font(.system(size: 12))
+                                            .foregroundColor(.green)
+                                            .padding(.leading, 4)
+                                        
+                                        Text("ACTIVE")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundColor(.green)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2)
+                                            .background(Color.green.opacity(0.1))
+                                            .cornerRadius(4)
+                                    }
+                                }
                                 
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text("Scroll: \(codeToOption(custom.config["scroll"] ?? 0, validOptions: scrollOptions))")
@@ -1304,10 +1274,24 @@ struct ContentView: View {
                     }
                     .padding()
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.white)
+                    .background(custom.isActive ? Color.green.opacity(0.1) : Color.white)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 0)
+                            .stroke(custom.isActive ? Color.green.opacity(0.3) : Color.clear, lineWidth: 2)
+                    )
                     
                     if custom.id != customs.last?.id {
                         Divider()
+                    }
+                }
+                
+                if bleManager.isConnected {
+                    VStack(spacing: 4) {
+                        Divider()
+                        Text("Device switch position: Custom \(bleManager.currentCustom + 1)")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                            .padding(.vertical, 8)
                     }
                 }
             }
@@ -1317,9 +1301,7 @@ struct ContentView: View {
         .shadow(radius: 5)
         .frame(width: 320)
     }
-
     
-    // MARK: - Help Menu View
     var helpMenuView: some View {
         VStack(spacing: 0) {
             Text("Help")
@@ -1369,7 +1351,6 @@ struct ContentView: View {
         .frame(width: 200)
     }
     
-    // MARK: - Helper Functions
     func getCustomNameForSlot(_ slot: Int) -> String {
         guard (1...3).contains(slot) else {
             return "Custom"
@@ -1381,20 +1362,6 @@ struct ContentView: View {
         } else {
             return "Custom \(slot)"
         }
-    }
-    
-    func findFirstAvailableSlot() -> Int {
-        for slot in 2...3 {
-            switch slot {
-            case 2 where custom2Data.isEmpty:
-                return 2
-            case 3 where custom3Data.isEmpty:
-                return 3
-            default:
-                continue
-            }
-        }
-        return 2
     }
     
     func saveCustom(slot: Int) {
@@ -1415,10 +1382,8 @@ struct ContentView: View {
             
             print("💾 Custom \(slot) saved locally: \(config)")
             
-            // CRITICAL: Also send to ESP32 with targetCustom parameter
-            // This allows saving to any custom, not just the current one
             if bleManager.isConnected {
-                let targetCustom = slot - 1  // Convert 1-based slot to 0-based index
+                let targetCustom = slot - 1
                 bleManager.writeConfigToCustom(config: config, targetCustom: targetCustom)
                 print("📤 Sent to ESP32 targeting Custom \(slot)")
             } else {
@@ -1436,44 +1401,12 @@ struct ContentView: View {
         UserDefaults.standard.set(trimmedName, forKey: "custom\(slot)Name")
         print("💾 Custom \(slot) renamed to: '\(trimmedName)'")
         UserDefaults.standard.synchronize()
-        
-        let savedName = UserDefaults.standard.string(forKey: "custom\(slot)Name")
-        print("💾 Verified saved name: '\(savedName ?? "nil")'")
     }
     
     func loadCustom(_ custom: Custom) {
         self.config = custom.config
         saveConfigurationIfConnected()
         print("📥 Loaded custom \(custom.id): \(custom.config)")
-    }
-    
-    var controllerOutline: some View {
-        GeometryReader { geometry in
-            ZStack {
-                let containerWidth = geometry.size.width
-                let containerHeight = geometry.size.height
-                let centerX = containerWidth / 2
-                
-                Path { path in
-                    let bodyWidth: CGFloat = 480 * 1.3
-                    let bodyHeight: CGFloat = (197.5 * 1.25) - 45
-                    let cornerRadius: CGFloat = 23.5
-                    
-                    let bodyRect = CGRect(
-                        x: centerX - bodyWidth / 2,
-                        y: containerHeight / 2 - bodyHeight / 2 - 40,
-                        width: bodyWidth,
-                        height: bodyHeight
-                    )
-                    
-                    path.addRoundedRect(
-                        in: bodyRect,
-                        cornerSize: CGSize(width: cornerRadius, height: cornerRadius)
-                    )
-                }
-                .fill(Color.gray.opacity(0.4))
-            }
-        }
     }
     
     var connectionLines: some View {
@@ -1486,70 +1419,35 @@ struct ContentView: View {
                 let button1CenterX = centerX - 60 + offset
                 let button2CenterX = centerX + 60 + offset
                 
-                let buttonBottomY: CGFloat = 308
-                let horizontalLineY: CGFloat = 338
-                let textTopY: CGFloat = 358
+                let arrowTipY: CGFloat = 308
+                let textTopY: CGFloat = 328  // Changed from 358 to 328 (20 points difference)
                 
-                let extensionAmount: CGFloat = 15      // how much longer the horizontal line gets
-                let horizontalShift: CGFloat = -15     // shift everything left by 15
-
-                let horizontalLineStartX = button1CenterX - 10 - extensionAmount / 2 + horizontalShift
-                let horizontalLineEndX   = button2CenterX + 100 + extensionAmount / 2 + horizontalShift + 5
-
-                Path { path in
-                    path.move(to: CGPoint(x: horizontalLineStartX, y: buttonBottomY))
-                    path.addLine(to: CGPoint(x: horizontalLineStartX, y: horizontalLineY))
-                }
-                .stroke(Color(red: 0.4, green: 0.2, blue: 0.6),
-                        style: StrokeStyle(lineWidth: 2))
+                let extensionAmount: CGFloat = 15
+                let horizontalShift: CGFloat = -15
                 
-                Path { path in
-                    path.move(to: CGPoint(x: horizontalLineEndX, y: buttonBottomY))
-                    path.addLine(to: CGPoint(x: horizontalLineEndX, y: horizontalLineY))
-                }
-                .stroke(Color(red: 0.4, green: 0.2, blue: 0.6),
-                        style: StrokeStyle(lineWidth: 2))
+                let originalStartX = button1CenterX - 10 - extensionAmount / 2 + horizontalShift
+                let originalEndX = button2CenterX + 100 + extensionAmount / 2 + horizontalShift + 5
+                
+                let centerPointX = (originalStartX + originalEndX) / 2
+                
+                let topSpacing: CGFloat = 50
+                
+                let verticalLineStartX = centerPointX - (topSpacing / 2)
+                let verticalLineEndX = centerPointX + (topSpacing / 2)
                 
                 Path { path in
-                    path.move(to: CGPoint(x: horizontalLineStartX, y: horizontalLineY))
-                    path.addLine(to: CGPoint(x: horizontalLineEndX, y: horizontalLineY))
-                }
-                .stroke(Color(red: 0.4, green: 0.2, blue: 0.6),
-                        style: StrokeStyle(lineWidth: 2))
-                
-                Path { path in
-                    let centerPointX = (horizontalLineStartX + horizontalLineEndX) / 2
-                    path.move(to: CGPoint(x: centerPointX, y: horizontalLineY))
+                    path.move(to: CGPoint(x: verticalLineStartX, y: arrowTipY))
                     path.addLine(to: CGPoint(x: centerPointX, y: textTopY))
                 }
-                .stroke(Color(red: 0.4, green: 0.2, blue: 0.6),
+                .stroke(Color.white,
                         style: StrokeStyle(lineWidth: 2))
                 
                 Path { path in
-                    let arrowSize: CGFloat = 8
-                    let tipX = horizontalLineStartX
-                    let tipY = buttonBottomY
-                    
-                    path.move(to: CGPoint(x: tipX, y: tipY))
-                    path.addLine(to: CGPoint(x: tipX - arrowSize, y: tipY + arrowSize))
-                    path.move(to: CGPoint(x: tipX, y: tipY))
-                    path.addLine(to: CGPoint(x: tipX + arrowSize, y: tipY + arrowSize))
+                    path.move(to: CGPoint(x: verticalLineEndX, y: arrowTipY))
+                    path.addLine(to: CGPoint(x: centerPointX, y: textTopY))
                 }
-                .stroke(Color(red: 0.4, green: 0.2, blue: 0.6),
-                        style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                
-                Path { path in
-                    let arrowSize: CGFloat = 8
-                    let tipX = horizontalLineEndX
-                    let tipY = buttonBottomY
-                    
-                    path.move(to: CGPoint(x: tipX, y: tipY))
-                    path.addLine(to: CGPoint(x: tipX - arrowSize, y: tipY + arrowSize))
-                    path.move(to: CGPoint(x: tipX, y: tipY))
-                    path.addLine(to: CGPoint(x: tipX + arrowSize, y: tipY + arrowSize))
-                }
-                .stroke(Color(red: 0.4, green: 0.2, blue: 0.6),
-                        style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                .stroke(Color.white,
+                        style: StrokeStyle(lineWidth: 2))
             }
         }
         .allowsHitTesting(false)
@@ -1565,7 +1463,6 @@ struct ContentView: View {
         case "button2":
             return codeToOption(code, validOptions: circleButton2Options)
         case "button3":
-            // Click on Scroll uses same options as Button 1
             return codeToOption(code, validOptions: circleButton1Options)
         case "combo":
             return codeToOption(code, validOptions: buttons12Options)
@@ -1574,7 +1471,6 @@ struct ContentView: View {
         }
     }
     
-    // Convert option string to numeric code
     func optionToCode(_ option: String) -> Int {
         switch option {
         case "Undo": return 3
@@ -1588,7 +1484,6 @@ struct ContentView: View {
         }
     }
     
-    // Convert numeric code to option string, with validation
     func codeToOption(_ code: Int, validOptions: [String]) -> String {
         let option: String
         switch code {
@@ -1656,6 +1551,16 @@ struct ScanButtonFrameKey: PreferenceKey {
     static var defaultValue: CGRect = .zero
     static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
         value = nextValue()
+    }
+}
+
+// MARK: - Navigation Bar Title Color Extension
+extension View {
+    func navigationBarTitleTextColor(_ color: Color) -> some View {
+        let uiColor = UIColor(color)
+        UINavigationBar.appearance().titleTextAttributes = [.foregroundColor: uiColor]
+        UINavigationBar.appearance().largeTitleTextAttributes = [.foregroundColor: uiColor]
+        return self
     }
 }
 

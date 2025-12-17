@@ -29,6 +29,11 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
     // App lifecycle state
     private var isAppActive = true
     private var shouldReconnectOnActive = false
+    
+    // Computed property to expose connected peripheral for UI
+    var connectedPeripheral: CBPeripheral? {
+        return isConnected ? targetPeripheral : nil
+    }
 
     override init() {
         super.init()

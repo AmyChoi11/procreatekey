@@ -577,3 +577,11 @@ struct DetectedProblemView: View {
         }
     }
 }
+
+// MARK: - Preview
+struct HelpView_Previews: PreviewProvider {
+    static var previews: some View {
+        HelpView()
+            .environmentObject(BLEManager())
+    }
+}
