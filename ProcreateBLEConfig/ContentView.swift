@@ -124,13 +124,6 @@ struct ContentView: View {
     // Force UI refresh trigger
     @State private var customsRefreshTrigger = false
     @State private var isShowingBluetoothView = false
-    
-    // Track if any dropdown is currently shown
-    private var isAnyDropdownShown: Bool {
-        showScrollDropdown || showButton1Dropdown || showButton2Dropdown || 
-        showComboDropdown || showCustomsDropdown || showClickScrollDropdown || 
-        showSaveCustomDropdown
-    }
 
     // Preset system - RENAMED TO CUSTOMS
     @AppStorage("custom1") private var custom1Data: String = ""
@@ -479,18 +472,7 @@ struct ContentView: View {
             }
         }
         .onReceive(bleManager.$currentConfig) { newConfig in
-            // Don't update if a dropdown is currently shown - prevents popover interference
-            guard !isAnyDropdownShown else {
-                print("⏸️ Skipping config update - dropdown is shown")
-                return
-            }
-            
-            // Only update if config actually changed - prevents unnecessary view rebuilds
-            guard newConfig != self.config else {
-                return
-            }
-            
-            print("� Loading configuration from device: \(newConfig)")
+            print("📥 Loading configuration from device: \(newConfig)")
             self.config = newConfig
         }
     }
