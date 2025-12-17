@@ -129,7 +129,7 @@ class ServerCallbacks : public BLEServerCallbacks {
 class ConfigCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic* pChar) {
     Serial.println("\n🔔 Config write received!");
-    std::string value = pChar->getValue();
+    String value = pChar->getValue();
     
     if (value.length() > 0) {
       Serial.println("========================================");
@@ -465,7 +465,7 @@ void setup() {
   
   // Security for HID (required by iOS)
   BLESecurity* security = new BLESecurity();
-  security->setAuthenticationMode(ESP_LE_AUTH_BOND);
+  security->setAuthenticationMode(ESP_LE_AUTH_REQ_SC_BOND);
   
   const uint8_t reportMap[] = {
     0x05, 0x01, 0x09, 0x06, 0xA1, 0x01, 0x85, 0x01, 0x05, 0x07,
