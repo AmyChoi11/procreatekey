@@ -896,12 +896,19 @@ struct ContentView: View {
                 
                 Spacer().frame(height: 30)
                 
+                // Status notification - positioned at bottom left, aligned with scan button
                 if !bleManager.statusMessage.isEmpty {
-                    StatusNotificationView(
-                        statusMessage: bleManager.statusMessage,
-                        isInitializing: bleManager.isInitializing
-                    )
-                    .offset(x: -400, y: -90)
+                    GeometryReader { geometry in
+                        StatusNotificationView(
+                            statusMessage: bleManager.statusMessage,
+                            isInitializing: bleManager.isInitializing
+                        )
+                        .frame(maxWidth: geometry.size.width * 0.5, alignment: .leading) // Max 50% of screen width, left aligned
+                        .position(
+                            x: scanButtonFrame.minX + (geometry.size.width * 0.25), // Align left edge with scan button
+                            y: geometry.size.height - 40 // 40pt from bottom
+                        )
+                    }
                 }
                 
                 // Save Custom Button
