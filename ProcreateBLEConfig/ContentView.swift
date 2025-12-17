@@ -1004,13 +1004,8 @@ struct ContentView: View {
     }
 
     private var bluetoothIconName: String {
-        if bleManager.isConnected {
-            return "dot.radiowaves.left.and.right.circle.fill"
-        } else if bleManager.isScanning {
-            return "dot.radiowaves.left.and.right.circle"
-        } else {
-            return "dot.radiowaves.left.and.right"
-        }
+        // Always return the same icon so it's always visible
+        return "dot.radiowaves.left.and.right"
     }
     
     func handleOnAppear() {
