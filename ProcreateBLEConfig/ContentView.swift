@@ -293,10 +293,10 @@ struct ContentView: View {
         VStack(spacing: 0) {
             Text("Save Current Configuration")
                 .font(.headline)
-                .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                .foregroundColor(Color(red: 0.22, green: 0.67, blue: 0.83))
                 .padding()
                 .frame(maxWidth: .infinity)
-                .background(Color.gray.opacity(0.1))
+                .background(Color(red: 0.81, green: 0.95, blue: 1.0))
             
             // Always show all 3 slots
             ForEach(1...3, id: \.self) { slot in
@@ -448,7 +448,7 @@ struct ContentView: View {
                     .toolbar {
                         toolbarContent
                     }
-                    .toolbarBackground(Color(red: 0.4, green: 0.2, blue: 0.6), for: .navigationBar)
+                    .toolbarBackground(Color(red: 0.22, green: 0.67, blue: 0.83), for: .navigationBar)
                     .toolbarBackground(.visible, for: .navigationBar)
                     .toolbarColorScheme(.dark, for: .navigationBar)
                     .navigationBarTitleTextColor(.white)
@@ -956,7 +956,7 @@ struct ContentView: View {
                     isShowingBluetoothView = true
                 }) {
                     Image(systemName: bluetoothIconName)
-                        .foregroundColor(.white)
+                        .foregroundColor(Color(red: 0.81, green: 0.95, blue: 1.0))
                         .font(.system(size: 18))
                 }
                 .overlay(
@@ -975,7 +975,7 @@ struct ContentView: View {
                 showHelpDropdown = true
             }) {
                 Image(systemName: "questionmark.circle")
-                    .foregroundColor(.white)
+                    .foregroundColor(Color(red: 0.81, green: 0.95, blue: 1.0))
                     .font(.system(size: 18))
             }
             .popover(isPresented: $showHelpDropdown, arrowEdge: .top) {
@@ -994,7 +994,7 @@ struct ContentView: View {
                     Text("Reset to Default")
                         .font(.system(size: 15, weight: .semibold))
                 }
-                .foregroundColor(.white)
+                .foregroundColor(Color(red: 0.81, green: 0.95, blue: 1.0))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
             }
@@ -1011,7 +1011,7 @@ struct ContentView: View {
                     Text("Customs")
                         .font(.system(size: 15, weight: .semibold))
                 }
-                .foregroundColor(.white)
+                .foregroundColor(Color(red: 0.81, green: 0.95, blue: 1.0))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
             }
@@ -1154,10 +1154,10 @@ struct ContentView: View {
         return VStack(spacing: 0) {
             Text("Saved Customs")
                 .font(.headline)
-                .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                .foregroundColor(Color(red: 0.22, green: 0.67, blue: 0.83))
                 .padding()
                 .frame(maxWidth: .infinity)
-                .background(Color.gray.opacity(0.1))
+                .background(Color(red: 0.81, green: 0.95, blue: 1.0))
             
             if customs.isEmpty {
                 Text("No customs saved")
