@@ -557,7 +557,6 @@ struct ContentView: View {
                                             selectedOption: getCurrentSelection(for: "scroll"),
                                             onSelect: { option in
                                                 config["scroll"] = optionToCode(option)
-                                                saveConfigurationIfConnected()
                                                 showScrollDropdown = false
                                             }
                                         )
@@ -609,7 +608,6 @@ struct ContentView: View {
                                             selectedOption: getCurrentSelection(for: "button1"),
                                             onSelect: { option in
                                                 config["button1"] = optionToCode(option)
-                                                saveConfigurationIfConnected()
                                                 showButton1Dropdown = false
                                             }
                                         )
@@ -661,7 +659,6 @@ struct ContentView: View {
                                             selectedOption: getCurrentSelection(for: "button2"),
                                             onSelect: { option in
                                                 config["button2"] = optionToCode(option)
-                                                saveConfigurationIfConnected()
                                                 showButton2Dropdown = false
                                             }
                                         )
@@ -746,7 +743,6 @@ struct ContentView: View {
                                 selectedOption: getCurrentSelection(for: "button3"),
                                 onSelect: { option in
                                     config["button3"] = optionToCode(option)
-                                    saveConfigurationIfConnected()
                                     showClickScrollDropdown = false
                                 }
                             )
@@ -822,7 +818,6 @@ struct ContentView: View {
                             selectedOption: getCurrentSelection(for: "combo"),
                             onSelect: { option in
                                 config["combo"] = optionToCode(option)
-                                saveConfigurationIfConnected()
                                 showComboDropdown = false
                             }
                         )
@@ -1087,7 +1082,6 @@ struct ContentView: View {
     // MARK: - Reset to Default
     func resetToDefault() {
         self.config = defaultConfig
-        saveConfigurationIfConnected()
         print("🔄 Reset to default configuration: \(defaultConfig)")
     }
     
@@ -1354,7 +1348,6 @@ struct ContentView: View {
     
     func loadCustom(_ custom: Custom) {
         self.config = custom.config
-        saveConfigurationIfConnected()
         print("📥 Loaded custom \(custom.id): \(custom.config)")
     }
     
