@@ -309,12 +309,6 @@ struct ContentView: View {
                 .background(Color.gray.opacity(0.1))
             
             // Always show all 3 slots
-            ForEach(1...3, id: \.self) { slot                 .foregroundColor(Color(red: 0.22, green: 0.67, blue: 0.83))
-                .padding()
-                .frame(maxWidth: .infinity)
-                .background(Color(red: 0.81, green: 0.95, blue: 1.0))
-            
-            // Always show all 3 slots
             ForEach(1...3, id: \.self) { slot in
                 Button(action: {
                     customToSave = slot
@@ -467,7 +461,6 @@ struct ContentView: View {
                     .toolbarBackground(Color(red: 0.22, green: 0.67, blue: 0.83), for: .navigationBar)
                     .toolbarBackground(.visible, for: .navigationBar)
                     .toolbarColorScheme(.dark, for: .navigationBar)
-                    .navigationBarTitleTextColor(.white)
                     .navigationTitle("CliQ")
                     .navigationBarTitleDisplayMode(.inline)
             }
@@ -1619,6 +1612,53 @@ struct DeviceSelectionSheet: View {
                             Text("").font(.caption)
                             Text("⚠️ If device was paired to iPad:").font(.subheadline).bold().foregroundColor(.red)
                             Text("Go to Settings → Bluetooth → Forget 'CliQ Controller'").font(.caption).foregroundColor(.red)
+                }
+            }
+            .navigationTitle("Select Device")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Cancel") {
+                        bleManager.stopScan()
+                        showDeviceSheet = false
+                    }
+                }
+            }
+        }
+    }
+}
+                            Text("Go to Settings  Bluetooth  Forget 'CliQ Controller'").font(.caption).foregroundColor(.red)
+                        }
+                        .padding()
+                        .background(Color.red.opacity(0.1))
+                        .cornerRadius(8)
+                        
+                        Button("Scan Again") {
+                            bleManager.startScan()
+                        }
+                        .padding()
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                    }
+                    .frame(maxHeight: .infinity)
+                    .padding()
+                } else {
+                    List {
+                        ForEach(bleManager.devices, id: \.identifier) { device in
+                            Button(action: {
+                                bleManager.connect(to: device)
+                                showDeviceSheet = false
+                            }) {
+                                HStack {
+                                    Image(systemName: "wifi")
+                                        .foregroundColor(.blue)
+                                    Text(device.name ?? "Unknown Device")
+                                        .foregroundColor(.primary)
+                                }
+                            }
+                        }
+                    }
                 }
             }
             .navigationTitle("Select Device")
