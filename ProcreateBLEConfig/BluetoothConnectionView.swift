@@ -18,24 +18,18 @@ struct BluetoothConnectionView: View {
                     Button(action: {
                         dismiss()
                     }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "chevron.left")
+                        Image(systemName: "chevron.left")
                                 .font(.system(size: 18, weight: .semibold))
-                            Text("Back")
-                                .font(.system(size: 16, weight: .semibold))
-                        }
-                        .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                        .foregroundColor(Color(red: 0.42, green: 0.64, blue: 0.80))
                         .padding(.horizontal, 16)
                         .padding(.vertical, 10)
-                        .background(Color.white)
-                        .cornerRadius(8)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color(red: 0.4, green: 0.2, blue: 0.6).opacity(0.3), lineWidth: 1)
+                            Circle()
+                                .fill(Color.gray.opacity(0.1))  // Light gray with 10% opacity
                         )
                     }
                     .padding(.leading, 20)
-                    .padding(.top, 60)
+                    .padding(.top, 20)
                     
                     Spacer()
                 }
@@ -103,6 +97,20 @@ struct BluetoothConnectionView: View {
                                     .fontWeight(.medium)
                             }
                         }
+                        
+                        // ADDED: Configure Now button
+                        Button(action: {
+                            dismiss()
+                        }) {
+                            Text("Configure Now")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 30)
+                                .padding(.vertical, 12)
+                                .background(Color.blue)
+                                .cornerRadius(10)
+                        }
+                        .padding(.top, 10)
                     }
                     .padding()
                     .background(Color.green.opacity(0.1))
@@ -135,9 +143,15 @@ struct BluetoothConnectionView: View {
                     isAnimating = true
                 }
             }
+            
+            // Debug
+            print("🔵 BluetoothConnectionView appeared")
+            print("   isConnected: \(bleManager.isConnected)")
+            print("   isScanning: \(bleManager.isScanning)")
         }
         .onDisappear {
             isAnimating = false
+            print("❌ BluetoothConnectionView disappeared")
         }
         .onChange(of: bleManager.isConnected) { newValue in
             print("🔄 BluetoothConnectionView: isConnected changed to \(newValue)")
@@ -155,6 +169,8 @@ struct BluetoothConnectionView: View {
             }
         }
         .onChange(of: bleManager.isScanning) { newValue in
+            print("🔄 BluetoothConnectionView: isScanning changed to \(newValue)")
+            
             if newValue {
                 // Stop pulsing when scanning starts
                 withAnimation {
