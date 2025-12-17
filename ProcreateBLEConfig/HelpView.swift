@@ -19,7 +19,7 @@ struct HelpView: View {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("FAQ")
                                 .font(.system(size: 22, weight: .bold))
-                                .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                                .foregroundColor(Color(red: 0.42, green: 0.64, blue: 0.80))
                                 .padding(.horizontal)
                             
                             if let problem = bleManager.detectedProblem {
@@ -113,7 +113,7 @@ struct HelpView: View {
             .navigationTitle("Help")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbarBackground(Color(red: 0.4, green: 0.2, blue: 0.6), for: .navigationBar)
+            .toolbarBackground(Color(red: 0.42, green: 0.64, blue: 0.80), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -151,7 +151,7 @@ struct HelpCategoryCard: View {
             HStack(spacing: 16) {
                 Image(systemName: icon)
                     .font(.system(size: 20))
-                    .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                    .foregroundColor(Color(red: 0.42, green: 0.64, blue: 0.80))
                     .frame(width: 40)
                 
                 VStack(alignment: .leading, spacing: 4) {
@@ -174,7 +174,7 @@ struct HelpCategoryCard: View {
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color(red: 0.4, green: 0.2, blue: 0.6).opacity(0.3), lineWidth: 1)
+                    .stroke(Color(red: 0.42, green: 0.64, blue: 0.80).opacity(0.3), lineWidth: 1)
             )
             .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
         }
@@ -190,7 +190,7 @@ struct HelpRowView: View {
         HStack(spacing: 16) {
             Image(systemName: icon)
                 .font(.system(size: 24))
-                .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                .foregroundColor(Color(red: 0.42, green: 0.64, blue: 0.80))
                 .frame(width: 40)
             
             VStack(alignment: .leading, spacing: 4) {
@@ -416,7 +416,7 @@ struct IssueListView: View {
                                 .cornerRadius(12)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 12)
-                                        .stroke(Color(red: 0.4, green: 0.2, blue: 0.6).opacity(0.3), lineWidth: 1)
+                                        .stroke(Color(red: 0.42, green: 0.64, blue: 0.80).opacity(0.3), lineWidth: 1)
                                 )
                                 .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
                             }
@@ -428,7 +428,7 @@ struct IssueListView: View {
             .navigationTitle(category.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbarBackground(Color(red: 0.4, green: 0.2, blue: 0.6), for: .navigationBar)
+            .toolbarBackground(Color(red: 0.42, green: 0.64, blue: 0.80), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -456,7 +456,7 @@ struct SolutionView: View {
                     VStack(alignment: .leading, spacing: 24) {
                         Text(issue.title)
                             .font(.system(size: 20, weight: .bold))
-                            .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                            .foregroundColor(Color(red: 0.42, green: 0.64, blue: 0.80))
                             .padding(.horizontal)
                             .padding(.top)
                         
@@ -467,7 +467,7 @@ struct SolutionView: View {
                                         .font(.system(size: 14, weight: .bold))
                                         .foregroundColor(.white)
                                         .frame(width: 28, height: 28)
-                                        .background(Color(red: 0.4, green: 0.2, blue: 0.6))
+                                        .background(Color(red: 0.42, green: 0.64, blue: 0.80))
                                         .cornerRadius(14)
                                     
                                     Text(step)
@@ -481,7 +481,7 @@ struct SolutionView: View {
                                 .cornerRadius(12)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 12)
-                                        .stroke(Color(red: 0.4, green: 0.2, blue: 0.6).opacity(0.3), lineWidth: 1)
+                                        .stroke(Color(red: 0.42, green: 0.64, blue: 0.80).opacity(0.3), lineWidth: 1)
                                 )
                                 .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
                             }
@@ -494,7 +494,7 @@ struct SolutionView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbarBackground(Color(red: 0.4, green: 0.2, blue: 0.6), for: .navigationBar)
+            .toolbarBackground(Color(red: 0.42, green: 0.64, blue: 0.80), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -566,7 +566,7 @@ struct DetectedProblemView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbarBackground(Color(red: 0.4, green: 0.2, blue: 0.6), for: .navigationBar)
+            .toolbarBackground(Color(red: 0.42, green: 0.64, blue: 0.80), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {

@@ -23,7 +23,8 @@ struct InteractiveTutorialView: View {
             title: "First Time Setup",
             description: "Open Settings > Bluetooth on your iPad and pair \"CliQ Controller\"",
             highlightArea: nil,
-            systemIcon: "bluetooth",
+            systemIcon: nil,  // No SF Symbol
+            customImageName: "icon",  // Your custom image
             actionRequired: false
         ),
         TutorialStep(
@@ -163,8 +164,8 @@ struct InteractiveTutorialView: View {
                 .frame(width: size.width + 16, height: size.height + 16)
                 .overlay(
                     RoundedRectangle(cornerRadius: isCircle ? (size.width + 16) / 2 : 12)
-                        .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), lineWidth: 3)
-                        .shadow(color: Color(red: 0.4, green: 0.2, blue: 0.6).opacity(0.6), radius: 20, x: 0, y: 0)
+                        .stroke(Color(red: 0.42, green: 0.64, blue: 0.80), lineWidth: 3)
+                        .shadow(color: Color(red: 0.42, green: 0.64, blue: 0.80).opacity(0.6), radius: 20, x: 0, y: 0)
                 )
                 .position(x: position.x + size.width / 2, y: position.y + size.height / 2)
             
@@ -223,7 +224,7 @@ struct InteractiveTutorialView: View {
         .frame(width: tooltipWidth)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(red: 0.4, green: 0.2, blue: 0.6))
+                .fill(Color(red: 0.42, green: 0.64, blue: 0.80))
                 .shadow(color: .black.opacity(1.0), radius: 15, x: 0, y: 5)
         )
         .position(x: geometry.size.width / 2, y: tooltipY + tooltipHeight / 2)
@@ -244,28 +245,36 @@ struct InteractiveTutorialView: View {
                 HStack(spacing: 8) {
                     ForEach(0..<steps.count, id: \.self) { index in
                         Circle()
-                            .fill(currentStep == index ? Color(red: 0.4, green: 0.2, blue: 0.6) : Color.gray.opacity(0.3))
+                            .fill(currentStep == index ? Color(red: 0.42, green: 0.64, blue: 0.80) : Color.gray.opacity(0.3))
                             .frame(width: 8, height: 8)
                     }
                 }
                 
-                // Icon
-                if let iconName = step.systemIcon {
+                // Icon - Check for custom image first, then SF Symbol
+                if let customImageName = step.customImageName {
+                    // Your custom image from assets
+                    Image(customImageName)  // This will load "icon" from your assets
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 80, height: 80)
+                        .foregroundColor(Color(red: 0.42, green: 0.64, blue: 0.80))
+                } else if let iconName = step.systemIcon {
+                    // SF Symbol (for backward compatibility)
                     ZStack {
                         Circle()
-                            .fill(Color(red: 0.4, green: 0.2, blue: 0.6).opacity(0.1))
+                            .fill(Color(red: 0.42, green: 0.64, blue: 0.80).opacity(0.1))
                             .frame(width: 80, height: 80)
                         
                         Image(systemName: iconName)
                             .font(.system(size: 48))
-                            .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                            .foregroundColor(Color(red: 0.42, green: 0.64, blue: 0.80))
                     }
                 }
                 
                 // Title
                 Text(step.title)
                     .font(.system(size: 22, weight: .bold))
-                    .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                    .foregroundColor(Color(red: 0.42, green: 0.64, blue: 0.80))
                     .multilineTextAlignment(.center)
                 
                 // Description
@@ -282,7 +291,7 @@ struct InteractiveTutorialView: View {
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
-                        .background(Color(red: 0.4, green: 0.2, blue: 0.6))
+                        .background(Color(red: 0.42, green: 0.64, blue: 0.80))
                         .cornerRadius(12)
                 }
                 .padding(.horizontal, 40)
@@ -407,7 +416,23 @@ struct TutorialStep {
     let description: String
     let highlightArea: HighlightArea?
     let systemIcon: String?
+    let customImageName: String?  // ADD THIS LINE
     let actionRequired: Bool
+    
+    // ADD THIS INITIALIZER
+    init(title: String,
+         description: String,
+         highlightArea: HighlightArea? = nil,
+         systemIcon: String? = nil,
+         customImageName: String? = nil,
+         actionRequired: Bool = false) {
+        self.title = title
+        self.description = description
+        self.highlightArea = highlightArea
+        self.systemIcon = systemIcon
+        self.customImageName = customImageName
+        self.actionRequired = actionRequired
+    }
 }
 
 enum HighlightArea {

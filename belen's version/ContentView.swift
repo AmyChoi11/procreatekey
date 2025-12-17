@@ -98,6 +98,7 @@ struct ContentView: View {
     @State private var scrollFrame: CGRect = .zero
     @State private var comboFrame: CGRect = .zero
     @State private var scanButtonFrame: CGRect = .zero
+    @State private var clickScrollFrame: CGRect = .zero
     
     // State for showing dropdowns with anchor frames
     @State private var showScrollDropdown = false
@@ -186,8 +187,10 @@ struct ContentView: View {
                         button1Frame: button1Frame,
                         button2Frame: button2Frame,
                         scrollFrame: scrollFrame,
-                        comboFrame: comboFrame
+                        comboFrame: comboFrame,
+                        clickScrollFrame: clickScrollFrame
                     )
+                    .ignoresSafeArea(.container)
                 }
                 
                 if showCustomRenameAlert {
@@ -746,6 +749,14 @@ struct ContentView: View {
                             }
                         }
                         .buttonStyle(PlainButtonStyle())
+                        .background(
+                            GeometryReader { geo in
+                                Color.clear.preference(key: ViewFrameKey.self, value: geo.frame(in: .global))
+                            }
+                        )
+                        .onPreferenceChange(ViewFrameKey.self) { frame in
+                            clickScrollFrame = frame
+                        }
                         .popover(isPresented: $showClickScrollDropdown,
                                  attachmentAnchor: .point(.bottom),
                                  arrowEdge: .top) {
@@ -972,7 +983,6 @@ struct ContentView: View {
             Button(action: {
                 showCustomsDropdown = true
                 if bleManager.isConnected {
-                    bleManager.checkActiveCustom()
                     customsRefreshTrigger.toggle()
                 }
             }) {
@@ -1248,7 +1258,7 @@ struct ContentView: View {
             
             Button(action: {
                 showHelpDropdown = false
-                showHelp = true  // ← ADD THIS LINE
+                showHelp = true
             }) {
                 HStack {
                     Image(systemName: "questionmark.circle")

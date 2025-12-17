@@ -10,6 +10,7 @@ struct InteractiveTutorialView: View {
     let button2Frame: CGRect
     let scrollFrame: CGRect
     let comboFrame: CGRect
+    let clickScrollFrame: CGRect
     
     // Namespace for matched geometry
     @Namespace private var tutorialNamespace
@@ -50,6 +51,13 @@ struct InteractiveTutorialView: View {
             title: "Configure Scroll Wheel",
             description: "Tap the scroll wheel (purple pill) to control brush size",
             highlightArea: .scroll,
+            systemIcon: nil,
+            actionRequired: true
+        ),
+        TutorialStep(
+            title: "Configure Click on Scroll",
+            description: "Tap the Click on Scroll button (purple pill with hand icon) to set what happens when you click the scroll wheel",
+            highlightArea: .clickScroll,
             systemIcon: nil,
             actionRequired: true
         ),
@@ -228,65 +236,122 @@ struct InteractiveTutorialView: View {
     private func infoCardView() -> some View {
         let step = steps[currentStep]
         
-        VStack {
-            Spacer()
-            
-            VStack(spacing: 20) {
-                // Progress dots
-                HStack(spacing: 8) {
-                    ForEach(0..<steps.count, id: \.self) { index in
-                        Circle()
-                            .fill(currentStep == index ? Color(red: 0.4, green: 0.2, blue: 0.6) : Color.gray.opacity(0.3))
-                            .frame(width: 8, height: 8)
+        // First page - full screen and clickable
+        if currentStep == 0 {
+            ZStack {
+                Color.black.opacity(0.85)
+                    .ignoresSafeArea()
+                
+                VStack(spacing: 30) {
+                    Spacer()
+                    
+                    // Icon
+                    if let iconName = step.systemIcon {
+                        ZStack {
+                            Circle()
+                                .fill(Color(red: 0.4, green: 0.2, blue: 0.6).opacity(0.2))
+                                .frame(width: 120, height: 120)
+                            
+                            Image(systemName: iconName)
+                                .font(.system(size: 60))
+                                .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                        }
                     }
-                }
-                
-                // Icon
-                if let iconName = step.systemIcon {
-                    ZStack {
-                        Circle()
-                            .fill(Color(red: 0.4, green: 0.2, blue: 0.6).opacity(0.1))
-                            .frame(width: 80, height: 80)
-                        
-                        Image(systemName: iconName)
-                            .font(.system(size: 48))
-                            .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
-                    }
-                }
-                
-                // Title
-                Text(step.title)
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
-                    .multilineTextAlignment(.center)
-                
-                // Description
-                Text(step.description)
-                    .font(.system(size: 15))
-                    .foregroundColor(.black.opacity(0.87))
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(2)
-                
-                // Action button
-                Button(action: nextStep) {
-                    Text(currentStep == steps.count - 1 ? "Get Started" : "Next")
-                        .font(.system(size: 18, weight: .semibold))
+                    
+                    // Title
+                    Text(step.title)
+                        .font(.system(size: 28, weight: .bold))
                         .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(Color(red: 0.4, green: 0.2, blue: 0.6))
-                        .cornerRadius(12)
+                        .multilineTextAlignment(.center)
+                    
+                    // Description
+                    Text(step.description)
+                        .font(.system(size: 18))
+                        .foregroundColor(.white.opacity(0.9))
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(4)
+                        .padding(.horizontal, 40)
+                    
+                    Spacer()
+                    
+                    // Tap to continue hint
+                    VStack(spacing: 12) {
+                        Image(systemName: "hand.tap.fill")
+                            .font(.system(size: 32))
+                            .foregroundColor(.white.opacity(0.7))
+                        
+                        Text("Tap anywhere to continue")
+                            .font(.system(size: 16))
+                            .foregroundColor(.white.opacity(0.7))
+                    }
+                    .padding(.bottom, 60)
                 }
-                .padding(.horizontal, 40)
             }
-            .padding(24)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.white)
-                    .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
-            )
-            .padding(.horizontal, 20)
-            .padding(.bottom, 80)
+            .onTapGesture {
+                nextStep()
+            }
+        } else {
+            // Other pages - card view at bottom
+            VStack {
+                Spacer()
+                
+                VStack(spacing: 20) {
+                    // Progress dots
+                    HStack(spacing: 8) {
+                        ForEach(0..<steps.count, id: \.self) { index in
+                            Circle()
+                                .fill(currentStep == index ? Color(red: 0.4, green: 0.2, blue: 0.6) : Color.gray.opacity(0.3))
+                                .frame(width: 8, height: 8)
+                        }
+                    }
+                    
+                    // Icon
+                    if let iconName = step.systemIcon {
+                        ZStack {
+                            Circle()
+                                .fill(Color(red: 0.4, green: 0.2, blue: 0.6).opacity(0.1))
+                                .frame(width: 80, height: 80)
+                            
+                            Image(systemName: iconName)
+                                .font(.system(size: 48))
+                                .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                        }
+                    }
+                    
+                    // Title
+                    Text(step.title)
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                        .multilineTextAlignment(.center)
+                    
+                    // Description
+                    Text(step.description)
+                        .font(.system(size: 15))
+                        .foregroundColor(.black.opacity(0.87))
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(2)
+                    
+                    // Action button
+                    Button(action: nextStep) {
+                        Text(currentStep == steps.count - 1 ? "Get Started" : "Next")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(Color(red: 0.4, green: 0.2, blue: 0.6))
+                            .cornerRadius(12)
+                    }
+                    .padding(.horizontal, 40)
+                }
+                .padding(24)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color.white)
+                        .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
+                )
+                .padding(.horizontal, 20)
+                .padding(.bottom, 80)
+            }
         }
     }
     
@@ -344,6 +409,19 @@ struct InteractiveTutorialView: View {
                 false
             )
             
+        case .clickScroll:
+            // Use actual clickScroll frame - it's a capsule/pill shape
+            let padding: CGFloat = 10
+            let localX = clickScrollFrame.midX - overlayOffset.x
+            let localY = clickScrollFrame.midY - overlayOffset.y
+            let width = clickScrollFrame.width + padding * 2
+            let height = clickScrollFrame.height + padding * 2
+            return (
+                CGPoint(x: localX - width / 2, y: localY - height / 2),
+                CGSize(width: width, height: height),
+                false
+            )
+            
         case .combo:
             // Use actual combo button frame
             let padding: CGFloat = 8
@@ -394,6 +472,7 @@ enum HighlightArea {
     case button1
     case button2
     case scroll
+    case clickScroll
     case combo
 }
 
@@ -407,7 +486,8 @@ struct InteractiveTutorialView_Previews: PreviewProvider {
             button1Frame: CGRect(x: 100, y: 300, width: 80, height: 80),
             button2Frame: CGRect(x: 250, y: 300, width: 80, height: 80),
             scrollFrame: CGRect(x: 180, y: 380, width: 60, height: 100),
-            comboFrame: CGRect(x: 20, y: 500, width: 350, height: 60)
+            comboFrame: CGRect(x: 20, y: 500, width: 350, height: 60),
+            clickScrollFrame: CGRect(x: 150, y: 450, width: 60, height: 100)
         )
     }
 }
