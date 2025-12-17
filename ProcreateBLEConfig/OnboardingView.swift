@@ -28,7 +28,7 @@ struct OnboardingView: View {
                         steps: [
                             "Power on your device",
                             "Open Settings > Bluetooth on iPad",
-                            "Tap 'XIAO Keyboard' to pair",
+                            "Tap 'CliQ Controller' to pair",
                             "Wait for 'Connected' status"
                         ]
                     )
@@ -39,7 +39,7 @@ struct OnboardingView: View {
                         title: "Configure Your Buttons",
                         steps: [
                             "Tap scan icon in this app",
-                            "Select 'XIAO Keyboard' from list",
+                            "Select 'CliQ Controller' from list",
                             "Change button functions as needed",
                             "Settings save automatically"
                         ]

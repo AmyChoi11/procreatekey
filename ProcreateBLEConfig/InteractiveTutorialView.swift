@@ -21,7 +21,7 @@ struct InteractiveTutorialView: View {
     let steps: [TutorialStep] = [
         TutorialStep(
             title: "First Time Setup",
-            description: "Open Settings > Bluetooth on your iPad and pair \"XIAO Keyboard\"",
+            description: "Open Settings > Bluetooth on your iPad and pair \"CliQ Controller\"",
             highlightArea: nil,
             systemIcon: "bluetooth",
             actionRequired: false

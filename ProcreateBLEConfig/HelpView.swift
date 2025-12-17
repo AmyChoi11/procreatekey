@@ -306,7 +306,7 @@ enum HelpIssue: Identifiable {
             
         case .deviceNotInApp:
             return [
-                "Check Settings > Bluetooth shows 'XIAO Keyboard Connected'",
+                "Check Settings > Bluetooth shows 'CliQ Controller Connected'",
                 "In this app, tap scan icon",
                 "Device should appear in list",
                 "Tap device to connect"
@@ -324,7 +324,7 @@ enum HelpIssue: Identifiable {
         case .buttonsNotWorking:
             return [
                 "Open Settings > Bluetooth",
-                "Find 'XIAO Keyboard' in MY DEVICES",
+                "Find 'CliQ Controller' in MY DEVICES",
                 "Status must show 'Connected'",
                 "If 'Not Connected', tap device name",
                 "Wait for 'Connected' status",

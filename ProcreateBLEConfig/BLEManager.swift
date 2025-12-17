@@ -133,7 +133,7 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
         for peripheral in connectedPeripherals {
             let deviceName = peripheral.name ?? "Unknown"
             print("   ✅ Already connected: \(deviceName)")
-            if deviceName.hasPrefix("XIAO") && !devices.contains(where: { $0.identifier == peripheral.identifier }) {
+            if deviceName.hasPrefix("CliQ") && !devices.contains(where: { $0.identifier == peripheral.identifier }) {
                 devices.append(peripheral)
                 print("   ➕ Added to device list")
             }
@@ -217,7 +217,7 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
             central.cancelPeripheralConnection(peripheral)
         }
         cleanupConnection()
-        updateStatusMessage("Disconnected from XIAO")
+        updateStatusMessage("Disconnected from CliQ Controller")
     }
     
     private func cleanupConnection() {
@@ -260,7 +260,7 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
             }
             
             if self.isConnected {
-                updateStatusMessage("Disconnected from XIAO")
+                updateStatusMessage("Disconnected from CliQ Controller")
                 cleanupConnection()
             }
             
@@ -403,9 +403,9 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
             return
         }
         
-        // Check if device name starts with "XIAO"
-        guard deviceName.hasPrefix("XIAO") else {
-            print("   ❌ Rejected: Name doesn't start with 'XIAO'")
+        // Check if device name starts with "CliQ"
+        guard deviceName.hasPrefix("CliQ") else {
+            print("   ❌ Rejected: Name doesn't start with 'CliQ'")
             return
         }
         
@@ -605,7 +605,7 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
             isConnectionStable = rssiValue > -80
             
             if !isConnectionStable && rssiValue < -90 {
-                updateStatusMessage("⚠️ Weak connection to XIAO")
+                updateStatusMessage("⚠️ Weak connection to CliQ Controller")
             }
         }
     }

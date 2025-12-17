@@ -1,5 +1,5 @@
 /*
- * XIAO ESP32-S3 BLE Keyboard with Custom Preset Switch
+ * CliQ Controller - ESP32-S3 BLE Keyboard with Custom Preset Switch
  * 
  * DESIGN PHILOSOPHY: Config service is ALWAYS accessible
  * 
@@ -386,7 +386,7 @@ void setup() {
   delay(1000);
   
   Serial.println("\n\n========================================");
-  Serial.println("XIAO BLE KEYBOARD - MODELESS");
+  Serial.println("CLIQ CONTROLLER - MODELESS");
   Serial.println("========================================");
   Serial.println("Design: No mode switching required!");
   Serial.println("• Config service ALWAYS accessible");
@@ -435,7 +435,7 @@ void setup() {
   
   // ===== INITIALIZE BLE WITH BOTH SERVICES =====
   Serial.println("🔵 Initializing BLE...");
-  BLEDevice::init("XIAO Keyboard");
+  BLEDevice::init("CliQ Controller");
   
   pServer = BLEDevice::createServer();
   pServer->setCallbacks(new ServerCallbacks());
@@ -445,7 +445,7 @@ void setup() {
   hid = new BLEHIDDevice(pServer);
   input = hid->inputReport(1);
   
-  hid->manufacturer()->setValue("XIAO");
+  hid->manufacturer()->setValue("CliQ");
   hid->pnp(0x02, 0x1234, 0x5678, 0x0110);
   hid->hidInfo(0x00, 0x01);
   
@@ -494,7 +494,7 @@ void setup() {
   Serial.println("\n========================================");
   Serial.println("✅ DEVICE READY");
   Serial.println("========================================");
-  Serial.println("📱 iPad: Pair 'XIAO Keyboard' in Bluetooth");
+  Serial.println("📱 iPad: Pair 'CliQ Controller' in Bluetooth");
   Serial.println("🔧 iOS App: Open anytime to reconfigure");
   Serial.println("   (No button press needed!)");
   Serial.println("========================================\n");
@@ -506,6 +506,9 @@ static bool button2Pressed = false;
 static bool button3Pressed = false;
 static bool comboPressed = false;
 static long lastEncoderPos = 0;
+static unsigned long button1PressTime = 0;
+static unsigned long button2PressTime = 0;
+const unsigned long COMBO_DETECTION_DELAY = 50;  // 50ms window to detect combo press
 
 void loop() {
   // ========== CUSTOM PRESET SWITCHING ==========
@@ -546,52 +549,79 @@ void loop() {
       lastEncoderPos = currentPos;
     }
     
-    // Buttons
+    // Buttons - IMPROVED COMBO DETECTION
     bool btn1Low = (digitalRead(BUTTON1_PIN) == LOW);
     bool btn2Low = (digitalRead(BUTTON2_PIN) == LOW);
     bool btn3Low = (digitalRead(BUTTON3_PIN) == LOW);
     bool bothPressed = btn1Low && btn2Low;
+    unsigned long currentTime = millis();
     
-    // Combo (button1+2)
+    // Track button press times
+    if (btn1Low && !button1Pressed) {
+      button1PressTime = currentTime;
+    }
+    if (btn2Low && !button2Pressed) {
+      button2PressTime = currentTime;
+    }
+    
+    // Combo (button1+2) - Highest priority
     if (bothPressed && !comboPressed) {
       Serial.println("🔘 COMBO PRESSED");
       comboPressed = true;
       sendFunctionKey(config.combo);
       button1Pressed = true;
       button2Pressed = true;
+      button1PressTime = 0;
+      button2PressTime = 0;
     } else if (!bothPressed && comboPressed) {
       comboPressed = false;
     }
     
-    // Button 1
-    if (btn1Low && !button1Pressed && !bothPressed) {
-      Serial.println("🔘 BUTTON 1");
-      button1Pressed = true;
-      
-      if (config.button1 == 6) {
-        sendBrushKey5(true);
-      } else {
-        sendFunctionKey(config.button1);
+    // Button 1 - Only trigger if button2 wasn't pressed within combo window
+    if (btn1Low && !button1Pressed && !bothPressed && !comboPressed) {
+      // Wait to see if button2 is also being pressed (combo detection)
+      if (button1PressTime > 0 && (currentTime - button1PressTime >= COMBO_DETECTION_DELAY)) {
+        // Check one more time if button2 is pressed
+        if (!digitalRead(BUTTON2_PIN) == LOW) {
+          Serial.println("🔘 BUTTON 1");
+          button1Pressed = true;
+          
+          if (config.button1 == 6) {
+            sendBrushKey5(true);
+          } else {
+            sendFunctionKey(config.button1);
+          }
+          button1PressTime = 0;
+        }
       }
     } else if (!btn1Low) {
       button1Pressed = false;
+      button1PressTime = 0;
     }
     
-    // Button 2
-    if (btn2Low && !button2Pressed && !bothPressed) {
-      Serial.println("🔘 BUTTON 2");
-      button2Pressed = true;
-      
-      if (config.button2 == 6) {
-        sendBrushKey5(false);
-      } else {
-        sendFunctionKey(config.button2);
+    // Button 2 - Only trigger if button1 wasn't pressed within combo window
+    if (btn2Low && !button2Pressed && !bothPressed && !comboPressed) {
+      // Wait to see if button1 is also being pressed (combo detection)
+      if (button2PressTime > 0 && (currentTime - button2PressTime >= COMBO_DETECTION_DELAY)) {
+        // Check one more time if button1 is pressed
+        if (!digitalRead(BUTTON1_PIN) == LOW) {
+          Serial.println("🔘 BUTTON 2");
+          button2Pressed = true;
+          
+          if (config.button2 == 6) {
+            sendBrushKey5(false);
+          } else {
+            sendFunctionKey(config.button2);
+          }
+          button2PressTime = 0;
+        }
       }
     } else if (!btn2Low) {
       button2Pressed = false;
+      button2PressTime = 0;
     }
     
-    // Button 3
+    // Button 3 - Independent, no combo
     if (btn3Low && !button3Pressed) {
       Serial.println("🔘 BUTTON 3");
       button3Pressed = true;

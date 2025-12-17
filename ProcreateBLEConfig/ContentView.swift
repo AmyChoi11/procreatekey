@@ -1546,7 +1546,7 @@ struct DeviceSelectionSheet: View {
                 if bleManager.isScanning {
                     VStack(spacing: 20) {
                         ProgressView().scaleEffect(1.5)
-                        Text("Scanning for XIAO_Config...").font(.headline)
+                        Text("Scanning for CliQ Controller...").font(.headline)
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Device must be in CONFIG MODE:").font(.caption).foregroundColor(.gray).bold()
                             Text("• First boot: Automatic").font(.caption).foregroundColor(.gray)
@@ -1563,16 +1563,16 @@ struct DeviceSelectionSheet: View {
                         Image(systemName: "exclamationmark.triangle")
                             .font(.system(size: 50))
                             .foregroundColor(.orange)
-                        Text("No XIAO_Config Found").font(.headline)
+                        Text("No CliQ Controller Found").font(.headline)
                         VStack(alignment: .leading, spacing: 8) {
                             Text("To enter CONFIG MODE:").font(.subheadline).bold()
                             Text("1️⃣ First boot: Device starts in CONFIG mode automatically").font(.caption)
                             Text("2️⃣ After configuration: Hold RESET button for 5 seconds").font(.caption)
                             Text("3️⃣ LED will flash rapidly 10 times").font(.caption)
-                            Text("4️⃣ Device shows as 'XIAO_Config'").font(.caption)
+                            Text("4️⃣ Device shows as 'CliQ Controller'").font(.caption)
                             Text("").font(.caption)
                             Text("⚠️ If device was paired to iPad:").font(.subheadline).bold().foregroundColor(.red)
-                            Text("Go to Settings → Bluetooth → Forget 'XIAO Keyboard'").font(.caption).foregroundColor(.red)
+                            Text("Go to Settings → Bluetooth → Forget 'CliQ Controller'").font(.caption).foregroundColor(.red)
                             Text("Then hold RESET button again").font(.caption).foregroundColor(.red)
                         }
                         .padding()
