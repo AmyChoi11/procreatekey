@@ -124,6 +124,11 @@ struct ContentView: View {
     // Force UI refresh trigger
     @State private var customsRefreshTrigger = false
     @State private var isShowingBluetoothView = false
+    
+    // Splash screen state - SIMPLE VERSION
+    @State private var splashActive = true
+    @State private var appWasInBackground = false
+    @State private var showSplashOnActive = false
 
     // Preset system - RENAMED TO CUSTOMS
     @AppStorage("custom1") private var custom1Data: String = ""
@@ -159,133 +164,108 @@ struct ContentView: View {
     // SCALING CONSTANTS
     private let controllerScale: CGFloat = 1.5
     private let buttonScale: CGFloat = 1.5
-    
+        
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                mainNavigationView
-                    .sheet(isPresented: $showDeviceSheet) {
-                        DeviceSelectionSheet(bleManager: bleManager, showDeviceSheet: $showDeviceSheet)
-                    }
-                    .sheet(isPresented: $showOnboarding) {
-                        OnboardingView(showOnboarding: $showOnboarding)
-                    }
-                    .sheet(isPresented: $showHelp) {
-                        HelpView()
-                            .environmentObject(bleManager)
-                    }
-                    .onAppear {
-                        handleOnAppear()
-                        startConnectionCheckTimer()
-                        
-                        // DEBUG: Check if image exists
-                        print("\n=== IMAGE DEBUG ===")
-                        
-                        // Test 1: Check with exact name
-                        if UIImage(named: "blackver") != nil {
-                            print("✅ UIImage(named: 'blackver') found the image")
-                        } else {
-                            print("❌ UIImage(named: 'blackver') returned nil")
+        ZStack {
+            if splashActive {
+                SplashScreenView(isActive: $splashActive)
+                    .zIndex(1000)
+            }
+            
+            // Main content (always there, but behind splash when active)
+            GeometryReader { geometry in
+                ZStack {
+                    mainNavigationView
+                        .sheet(isPresented: $showDeviceSheet) {
+                            DeviceSelectionSheet(bleManager: bleManager, showDeviceSheet: $showDeviceSheet)
                         }
-                        
-                        // Test 2: Try with extension (sometimes needed for loose files)
-                        if UIImage(named: "blackver.png") != nil {
-                            print("✅ UIImage(named: 'blackver.png') found the image")
-                        } else {
-                            print("❌ UIImage(named: 'blackver.png') returned nil")
+                        .sheet(isPresented: $showOnboarding) {
+                            OnboardingView(showOnboarding: $showOnboarding)
                         }
-                        
-                        // Test 3: List all png files in bundle
-                        print("\n📁 Searching for png files in bundle...")
-                        if let resourcePath = Bundle.main.resourcePath {
-                            let enumerator = FileManager.default.enumerator(atPath: resourcePath)
-                            var foundpngs = [String]()
-                            
-                            while let file = enumerator?.nextObject() as? String {
-                                if file.lowercased().hasSuffix(".png") || file.lowercased().hasSuffix(".jpg") {
-                                    foundpngs.append(file)
-                                }
-                            }
-                            
-                            if foundpngs.isEmpty {
-                                print("   No png files found at all!")
-                            } else {
-                                print("   Found \(foundpngs.count) png file(s):")
-                                for file in foundpngs.sorted() {
-                                    print("   📄 \(file)")
-                                }
+                        .sheet(isPresented: $showHelp) {
+                            HelpView()
+                                .environmentObject(bleManager)
+                        }
+                        .onAppear {
+                            handleOnAppear()
+                            startConnectionCheckTimer()
+                        }
+                        .onDisappear {
+                            stopConnectionCheckTimer()
+                        }
+                        .onChange(of: bleManager.detectedProblem) { problem in
+                            if problem != nil {
+                                showHelp = true
                             }
                         }
-                        print("=== END DEBUG ===\n")
-                    }
-                    .onDisappear {
-                        stopConnectionCheckTimer()
-                    }
-                    .onChange(of: scenePhase) { newPhase in
-                        handleScenePhaseChange(newPhase)
-                    }
-                    .onChange(of: bleManager.detectedProblem) { problem in
-                        if problem != nil {
-                            showHelp = true
-                        }
-                    }
-                    .onChange(of: bleManager.currentCustom) { newCustom in
-                        print("🔄 Active custom changed to: \(newCustom)")
-                        customsRefreshTrigger.toggle()
-                    }
-                    .onChange(of: bleManager.isConnected) { connected in
-                        if connected {
-                            print("✅ Connected - refreshing customs")
+                        .onChange(of: bleManager.currentCustom) { newCustom in
+                            print("🔄 Active custom changed to: \(newCustom)")
                             customsRefreshTrigger.toggle()
                         }
-                    }
-                
-                // Tutorial overlay
-                if showInteractiveTutorial {
-                    InteractiveTutorialView(
-                        showTutorial: $showInteractiveTutorial,
-                        hasCompletedOnboarding: $hasCompletedOnboarding,
-                        scanButtonFrame: scanButtonFrame,
-                        button1Frame: button1Frame,
-                        button2Frame: button2Frame,
-                        scrollFrame: scrollFrame,
-                        clickScrollFrame: clickScrollFrame,
-                        comboFrame: comboFrame
-                    )
-                    .ignoresSafeArea(.container)
-                }
-                
-                // SINGLE SET OF POPUPS - positioned correctly
-                if showCustomRenameAlert {
-                    Color.black.opacity(0.4)
-                        .ignoresSafeArea()
-                        .overlay(
-                            renameCustomPopup()
-                                .padding(20)
-                        )
-                }
-                
-                if showSaveConfirmation {
-                    Color.black.opacity(0.4)
-                        .ignoresSafeArea()
-                        .overlay(
-                            saveConfirmationPopup()
-                                .padding(20)
-                        )
-                }
-                
-                if showSaveCustomDropdown {
-                    Color.black.opacity(0.4)
-                        .ignoresSafeArea()
-                        .overlay(
-                            saveCustomDropdownView()
-                                .padding(20)
-                        )
-                        .onTapGesture {
-                            showSaveCustomDropdown = false
+                        .onChange(of: bleManager.isConnected) { connected in
+                            if connected {
+                                print("✅ Connected - refreshing customs")
+                                customsRefreshTrigger.toggle()
+                            }
                         }
+                    
+                    // Tutorial overlay
+                    if showInteractiveTutorial {
+                        InteractiveTutorialView(
+                            showTutorial: $showInteractiveTutorial,
+                            hasCompletedOnboarding: $hasCompletedOnboarding,
+                            scanButtonFrame: scanButtonFrame,
+                            button1Frame: button1Frame,
+                            button2Frame: button2Frame,
+                            scrollFrame: scrollFrame,
+                            clickScrollFrame: clickScrollFrame,
+                            comboFrame: comboFrame
+                        )
+                        .ignoresSafeArea(.container)
+                    }
+                    
+                    // SINGLE SET OF POPUPS - positioned correctly
+                    if showCustomRenameAlert {
+                        Color.black.opacity(0.4)
+                            .ignoresSafeArea()
+                            .overlay(
+                                renameCustomPopup()
+                                    .padding(20)
+                            )
+                    }
+                    
+                    if showSaveConfirmation {
+                        Color.black.opacity(0.4)
+                            .ignoresSafeArea()
+                            .overlay(
+                                saveConfirmationPopup()
+                                    .padding(20)
+                            )
+                    }
+                    
+                    if showSaveCustomDropdown {
+                        Color.black.opacity(0.4)
+                            .ignoresSafeArea()
+                            .overlay(
+                                saveCustomDropdownView()
+                                    .padding(20)
+                            )
+                            .onTapGesture {
+                                showSaveCustomDropdown = false
+                            }
+                    }
                 }
             }
+        }
+        .onAppear {
+            // Only show splash on first launch
+            if !showSplashOnActive {
+                splashActive = true
+                showSplashOnActive = true
+            }
+        }
+        .onChange(of: scenePhase) { newPhase in
+            handleScenePhaseChange(newPhase)
         }
     }
     
@@ -293,13 +273,7 @@ struct ContentView: View {
         VStack(spacing: 0) {
             Text("Save Current Configuration")
                 .font(.headline)
-                .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
-                .padding()
-                .frame(maxWidth: .infinity)
-                .background(Color.gray.opacity(0.1))
-            
-            // Always show all 3 slots
-            ForEach(1...3, id: \.self) { slot                 .foregroundColor(Color(red: 0.22, green: 0.67, blue: 0.83))
+                .foregroundColor(Color(red: 0.098, green: 0.208, blue: 0.357))
                 .padding()
                 .frame(maxWidth: .infinity)
                 .background(Color(red: 0.81, green: 0.95, blue: 1.0))
@@ -347,7 +321,7 @@ struct ContentView: View {
             Text("Rename Custom")
                 .font(.headline)
                 .fontWeight(.bold)
-                .foregroundColor(.primary)
+                .foregroundColor(Color(red: 0.098, green: 0.208, blue: 0.357))
             
             TextField("Enter name", text: $customRenameText)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
@@ -399,7 +373,7 @@ struct ContentView: View {
             Text("Save Custom")
                 .font(.headline)
                 .fontWeight(.bold)
-                .foregroundColor(.primary)
+                .foregroundColor(Color(red: 0.098, green: 0.208, blue: 0.357))
             
             Text("Save as '\(getCustomNameForSlot(customToSave))'?")
                 .multilineTextAlignment(.center)
@@ -454,7 +428,7 @@ struct ContentView: View {
                     .toolbar {
                         toolbarContent
                     }
-                    .toolbarBackground(Color(red: 0.22, green: 0.67, blue: 0.83), for: .navigationBar)
+                    .toolbarBackground(Color(red: 0.42, green: 0.64, blue: 0.80), for: .navigationBar)
                     .toolbarBackground(.visible, for: .navigationBar)
                     .toolbarColorScheme(.dark, for: .navigationBar)
                     .navigationBarTitleTextColor(.white)
@@ -552,7 +526,7 @@ struct ContentView: View {
                                     }) {
                                         ZStack {
                                             Capsule()
-                                                .fill(Color(red: 0.7, green: 0.5, blue: 0.9).opacity(0.8))
+                                                .fill(Color(red: 0.235, green: 0.329, blue: 0.569))
                                                 .frame(width: 60 * buttonScale, height: 100 * buttonScale)
                                             
                                             Capsule()
@@ -583,6 +557,7 @@ struct ContentView: View {
                                             selectedOption: getCurrentSelection(for: "scroll"),
                                             onSelect: { option in
                                                 config["scroll"] = optionToCode(option)
+                                                saveConfigurationIfConnected()
                                                 showScrollDropdown = false
                                             }
                                         )
@@ -609,7 +584,7 @@ struct ContentView: View {
                                     }) {
                                         ZStack {
                                             Circle()
-                                                .fill(Color(red: 0.85, green: 0.4, blue: 0.7).opacity(0.8))
+                                                .fill(Color(red: 0.302, green: 0.475, blue: 0.769))
                                                 .frame(width: 80 * buttonScale, height: 80 * buttonScale)
                                             
                                             Circle()
@@ -634,6 +609,7 @@ struct ContentView: View {
                                             selectedOption: getCurrentSelection(for: "button1"),
                                             onSelect: { option in
                                                 config["button1"] = optionToCode(option)
+                                                saveConfigurationIfConnected()
                                                 showButton1Dropdown = false
                                             }
                                         )
@@ -660,7 +636,7 @@ struct ContentView: View {
                                     }) {
                                         ZStack {
                                             Circle()
-                                                .fill(Color(red: 0.5, green: 0.4, blue: 0.9).opacity(0.8))
+                                                .fill(Color(red: 0.098, green: 0.208, blue: 0.357))
                                                 .frame(width: 80 * buttonScale, height: 80 * buttonScale)
                                             
                                             Circle()
@@ -685,6 +661,7 @@ struct ContentView: View {
                                             selectedOption: getCurrentSelection(for: "button2"),
                                             onSelect: { option in
                                                 config["button2"] = optionToCode(option)
+                                                saveConfigurationIfConnected()
                                                 showButton2Dropdown = false
                                             }
                                         )
@@ -737,7 +714,7 @@ struct ContentView: View {
                         }) {
                             ZStack {
                                 Capsule()
-                                    .fill(Color(red: 0.7, green: 0.5, blue: 0.9).opacity(0.8))
+                                    .fill(Color(red: 0.235, green: 0.329, blue: 0.569))
                                     .frame(width: 54, height: 90)
                                 
                                 Capsule()
@@ -769,6 +746,7 @@ struct ContentView: View {
                                 selectedOption: getCurrentSelection(for: "button3"),
                                 onSelect: { option in
                                     config["button3"] = optionToCode(option)
+                                    saveConfigurationIfConnected()
                                     showClickScrollDropdown = false
                                 }
                             )
@@ -798,7 +776,7 @@ struct ContentView: View {
                         HStack(spacing: 10) {
                             ZStack {
                                 Circle()
-                                    .fill(Color(red: 0.85, green: 0.4, blue: 0.7).opacity(0.8))
+                                    .fill(Color(red: 0.302, green: 0.475, blue: 0.769))
                                     .frame(width: 50, height: 50)
                                 
                                 Circle()
@@ -816,7 +794,7 @@ struct ContentView: View {
                             
                             ZStack {
                                 Circle()
-                                    .fill(Color(red: 0.5, green: 0.4, blue: 0.9).opacity(0.8))
+                                    .fill(Color(red: 0.098, green: 0.208, blue: 0.357))
                                     .frame(width: 50, height: 50)
                                 
                                 Circle()
@@ -844,6 +822,7 @@ struct ContentView: View {
                             selectedOption: getCurrentSelection(for: "combo"),
                             onSelect: { option in
                                 config["combo"] = optionToCode(option)
+                                saveConfigurationIfConnected()
                                 showComboDropdown = false
                             }
                         )
@@ -864,7 +843,7 @@ struct ContentView: View {
                         .frame(maxWidth: geometry.size.width * 0.5, alignment: .leading) // Max 50% of screen width, left aligned
                         .position(
                             x: scanButtonFrame.minX + (geometry.size.width * 0.25), // Align left edge with scan button
-                            y: geometry.size.height - 98 // 98pt from bottom
+                            y: geometry.size.height - 100 // 100pt from bottom
                         )
                     }
                 }
@@ -878,18 +857,18 @@ struct ContentView: View {
                         HStack(spacing: 8) {
                             Image(systemName: "square.and.arrow.down")
                                 .font(.system(size: 16))
-                                .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                                .foregroundColor(.white)
                             Text("Save as Custom")
                                 .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                                .foregroundColor(.white)
                         }
                         .padding(.horizontal, 20)
                         .padding(.vertical, 12)
-                        .background(Color.white)
+                        .background(Color(red: 0.42, green: 0.64, blue: 0.80).opacity(0.5))
                         .cornerRadius(10)
                         .overlay(
                             RoundedRectangle(cornerRadius: 10)
-                                .stroke(Color(red: 0.4, green: 0.2, blue: 0.6), lineWidth: 2)
+                                .stroke(Color(red: 0.42, green: 0.64, blue: 0.80), lineWidth: 2)
                         )
                     }
                     .padding(.trailing, 50)
@@ -1025,13 +1004,8 @@ struct ContentView: View {
     }
 
     private var bluetoothIconName: String {
-        if bleManager.isConnected {
-            return "dot.radiowaves.left.and.right.circle.fill"
-        } else if bleManager.isScanning {
-            return "dot.radiowaves.left.and.right.circle"
-        } else {
-            return "dot.radiowaves.left.and.right"
-        }
+        // Always return the same icon so it's always visible
+        return "dot.radiowaves.left.and.right"
     }
     
     func handleOnAppear() {
@@ -1065,15 +1039,25 @@ struct ContentView: View {
         switch newPhase {
         case .background:
             print("📱 App going to background")
-            // BLE manager handles this via notifications
+            appWasInBackground = true
             
         case .inactive:
             print("📱 App inactive")
             
         case .active:
             print("📱 App active")
+            
+            // Only show splash if NOT returning from background
+            // (i.e., only on cold start)
+            if !appWasInBackground && !showSplashOnActive {
+                splashActive = true
+                showSplashOnActive = true
+            }
+            
+            // Reset for next time
+            appWasInBackground = false
+            
             // BLE manager handles this via notifications
-            // Just refresh our UI state
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                 if self.bleManager.isConnected {
                     self.customsRefreshTrigger.toggle()
@@ -1155,7 +1139,7 @@ struct ContentView: View {
         return VStack(spacing: 0) {
             Text("Saved Customs")
                 .font(.headline)
-                .foregroundColor(Color(red: 0.22, green: 0.67, blue: 0.83))
+                .foregroundColor(Color(red: 0.098, green: 0.208, blue: 0.357))
                 .padding()
                 .frame(maxWidth: .infinity)
                 .background(Color(red: 0.81, green: 0.95, blue: 1.0))
@@ -1271,7 +1255,7 @@ struct ContentView: View {
         VStack(spacing: 0) {
             Text("Help")
                 .font(.headline)
-                .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                .foregroundColor(Color(red: 0.42, green: 0.64, blue: 0.80))
                 .padding()
                 .frame(maxWidth: .infinity)
                 .background(Color.gray.opacity(0.1))
@@ -1282,7 +1266,7 @@ struct ContentView: View {
             }) {
                 HStack {
                     Image(systemName: "questionmark.circle")
-                        .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                        .foregroundColor(Color(red: 0.42, green: 0.64, blue: 0.80))
                     Text("FAQ")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(.black)
@@ -1300,7 +1284,7 @@ struct ContentView: View {
             }) {
                 HStack {
                     Image(systemName: "book.circle")
-                        .foregroundColor(Color(red: 0.4, green: 0.2, blue: 0.6))
+                        .foregroundColor(Color(red: 0.42, green: 0.64, blue: 0.80))
                     Text("First Time Guide")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(.black)
@@ -1574,6 +1558,40 @@ struct DeviceSelectionSheet: View {
                             Text("").font(.caption)
                             Text("⚠️ If device was paired to iPad:").font(.subheadline).bold().foregroundColor(.red)
                             Text("Go to Settings → Bluetooth → Forget 'CliQ Controller'").font(.caption).foregroundColor(.red)
+                            Text("Then hold RESET button again").font(.caption).foregroundColor(.red)
+                        }
+                        .padding()
+                        .background(Color.orange.opacity(0.1))
+                        .cornerRadius(8)
+                        
+                        Button("Scan Again") {
+                            bleManager.startScan()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.orange)
+                    }
+                    .frame(maxHeight: .infinity)
+                    .padding()
+                } else {
+                    List(bleManager.devices, id: \.identifier) { device in
+                        Button(action: {
+                            bleManager.connect(to: device)
+                            showDeviceSheet = false
+                        }) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(device.name ?? "Unknown Device").font(.headline)
+                                Text(device.identifier.uuidString)
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                            .padding(.vertical, 8)
+                        }
+                    }
+                    
+                    Text("Found \(bleManager.devices.count) device(s)")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .padding()
                 }
             }
             .navigationTitle("Select Device")
