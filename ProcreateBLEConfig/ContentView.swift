@@ -445,10 +445,6 @@ struct ContentView: View {
                 isShowingBluetoothView = false  // Close Bluetooth page when connected
             }
         }
-        .onReceive(bleManager.$currentConfig) { newConfig in
-            print("📥 Loading configuration from device: \(newConfig)")
-            self.config = newConfig
-        }
     }
     
     private var mainContentView: some View {
