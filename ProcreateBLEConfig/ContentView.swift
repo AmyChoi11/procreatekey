@@ -17,7 +17,7 @@ struct StatusNotificationView: View {
         let borderColor: Color
         
         if isInitializingBluetooth {
-            // Initializing state - Pastel Yellow
+            // Initializing state - PASTEL YELLOW
             iconName = "arrow.triangle.2.circlepath.circle"
             iconColor = Color(red: 1.0, green: 0.85, blue: 0.4) // PASTEL YELLOW
             backgroundColor = Color(red: 1.0, green: 0.85, blue: 0.4).opacity(0.1)
@@ -86,9 +86,6 @@ struct ContentView: View {
         "scroll": 6     // Brush Size ±5%
     ]  // Undo, Erase, Brush Library, Brush Size 5%
     
-    // Track the last config loaded from device (to detect hardware switch changes)
-    @State private var lastDeviceConfig: [String: Int]? = nil
-    
     @State private var showDeviceSheet = false
     @State private var hasShownInitialSheet = false
     @State private var showOnboarding = false
@@ -127,6 +124,9 @@ struct ContentView: View {
     // Force UI refresh trigger
     @State private var customsRefreshTrigger = false
     @State private var isShowingBluetoothView = false
+    
+    // Track current custom number to detect hardware switch changes
+    @State private var lastKnownCustomNumber: Int = 0
     
     // Track if any dropdown is currently shown
     private var isAnyDropdownShown: Bool {
@@ -309,6 +309,12 @@ struct ContentView: View {
                 .background(Color.gray.opacity(0.1))
             
             // Always show all 3 slots
+            ForEach(1...3, id: \.self) { slot                 .foregroundColor(Color(red: 0.22, green: 0.67, blue: 0.83))
+                .padding()
+                .frame(maxWidth: .infinity)
+                .background(Color(red: 0.81, green: 0.95, blue: 1.0))
+            
+            // Always show all 3 slots
             ForEach(1...3, id: \.self) { slot in
                 Button(action: {
                     customToSave = slot
@@ -461,6 +467,7 @@ struct ContentView: View {
                     .toolbarBackground(Color(red: 0.22, green: 0.67, blue: 0.83), for: .navigationBar)
                     .toolbarBackground(.visible, for: .navigationBar)
                     .toolbarColorScheme(.dark, for: .navigationBar)
+                    .navigationBarTitleTextColor(.white)
                     .navigationTitle("CliQ")
                     .navigationBarTitleDisplayMode(.inline)
             }
@@ -475,32 +482,23 @@ struct ContentView: View {
             }
         }
         .onReceive(bleManager.$currentConfig) { newConfig in
-            // Don't update if a dropdown is currently shown - prevents popover interference
-            guard !isAnyDropdownShown else {
-                print("⏸️ Skipping config update - dropdown is shown")
+            // INTENTIONALLY DO NOTHING HERE
+            // Main screen is for free editing - don't auto-update from polling
+            // Only update when:
+            // 1. User selects from Saved Customs dropdown (handled in loadCustomToMainScreen)
+            // 2. Hardware switch changes (handled in onReceive bleManager.$currentCustom)
+        }
+        .onReceive(bleManager.$currentCustom) { customNumber in
+            // Hardware switch detected - update UI to show new custom's config
+            guard customNumber != lastKnownCustomNumber else {
                 return
             }
             
-            // CRITICAL: Only update UI in these cases:
-            // 1. First time loading (lastDeviceConfig is nil)
-            // 2. Hardware switch detected (device config changed from last known)
+            print("🔄 Hardware switch detected: Custom \(lastKnownCustomNumber + 1) → Custom \(customNumber + 1)")
+            lastKnownCustomNumber = customNumber
             
-            if lastDeviceConfig == nil {
-                // First load - always update
-                print("📥 Initial config load from device: \(newConfig)")
-                self.config = newConfig
-                self.lastDeviceConfig = newConfig
-            } else if newConfig != lastDeviceConfig {
-                // Hardware switch detected - device config changed!
-                print("🔄 Hardware switch detected!")
-                print("   Previous device config: \(lastDeviceConfig!)")
-                print("   New device config: \(newConfig)")
-                self.config = newConfig
-                self.lastDeviceConfig = newConfig
-            } else {
-                // Same device config - user is editing freely, don't interrupt
-                // This allows user to make changes without polling overwriting them
-            }
+            // Update UI to match the new custom
+            self.config = bleManager.currentConfig
         }
     }
     
@@ -1396,20 +1394,9 @@ struct ContentView: View {
     }
     
     func loadCustom(_ custom: Custom) {
-        print("📥 Loading custom \(custom.id) to main screen: \(custom.config)")
-        
-        // Update main screen immediately
         self.config = custom.config
-        
-        // Send to device
         saveConfigurationIfConnected()
-        
-        // IMPORTANT: Update lastDeviceConfig AFTER a delay to allow device to process
-        // This prevents polling from detecting false "hardware switch" during device write
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            self.lastDeviceConfig = custom.config
-            print("✅ Updated lastDeviceConfig tracker after device write")
-        }
+        print("📥 Loaded custom \(custom.id): \(custom.config)")
     }
     
     var connectionLines: some View {
@@ -1612,37 +1599,6 @@ struct DeviceSelectionSheet: View {
                             Text("").font(.caption)
                             Text("⚠️ If device was paired to iPad:").font(.subheadline).bold().foregroundColor(.red)
                             Text("Go to Settings → Bluetooth → Forget 'CliQ Controller'").font(.caption).foregroundColor(.red)
-                        }
-                        .padding()
-                        .background(Color.red.opacity(0.1))
-                        .cornerRadius(8)
-                        
-                        Button("Scan Again") {
-                            bleManager.startScan()
-                        }
-                        .padding()
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(8)
-                    }
-                    .frame(maxHeight: .infinity)
-                    .padding()
-                } else {
-                    List {
-                        ForEach(bleManager.devices, id: \.identifier) { device in
-                            Button(action: {
-                                bleManager.connect(to: device)
-                                showDeviceSheet = false
-                            }) {
-                                HStack {
-                                    Image(systemName: "wifi")
-                                        .foregroundColor(.blue)
-                                    Text(device.name ?? "Unknown Device")
-                                        .foregroundColor(.primary)
-                                }
-                            }
-                        }
-                    }
                 }
             }
             .navigationTitle("Select Device")
