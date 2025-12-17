@@ -23,6 +23,8 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
     private var scanTimer: Timer?
     private var noDevicesTimer: Timer?
     private var connectionTimeout: Timer?
+    private var serviceDiscoveryRetryCount = 0
+    private let maxServiceDiscoveryRetries = 3
     private var configPollTimer: Timer?  // Auto-poll config to detect hardware switch changes
     private var connectionCheckTimer: Timer?  // Periodic connection verification
     
@@ -174,15 +176,38 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
         stopScan()
         targetPeripheral = peripheral
         peripheral.delegate = self
-        central.connect(peripheral, options: nil)
-        statusMessage = "Connecting..."
+        serviceDiscoveryRetryCount = 0  // Reset retry counter for new connection
         
-        connectionTimeout?.invalidate()
-        connectionTimeout = Timer.scheduledTimer(withTimeInterval: 15.0, repeats: false) { [weak self] _ in
-            guard let self = self else { return }
-            if !self.isConnected {
-                self.detectedProblem = .connectionFailed
-                self.central.cancelPeripheralConnection(peripheral)
+        // Check if already connected (e.g., paired as keyboard)
+        if peripheral.state == .connected {
+            print("✅ Peripheral already connected - discovering services directly")
+            statusMessage = "Already connected! Discovering services..."
+            
+            // Peripheral is already connected, just discover services
+            peripheral.discoverServices(nil)
+            
+            DispatchQueue.main.async {
+                self.isConnected = true
+                self.isConnectionStable = true
+            }
+            
+            // Start timers
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                self.startConfigPolling()
+                self.startConnectionCheckTimer()
+            }
+        } else {
+            print("🔌 Connecting to peripheral...")
+            central.connect(peripheral, options: nil)
+            statusMessage = "Connecting..."
+            
+            connectionTimeout?.invalidate()
+            connectionTimeout = Timer.scheduledTimer(withTimeInterval: 15.0, repeats: false) { [weak self] _ in
+                guard let self = self else { return }
+                if !self.isConnected {
+                    self.detectedProblem = .connectionFailed
+                    self.central.cancelPeripheralConnection(peripheral)
+                }
             }
         }
     }
@@ -453,9 +478,26 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
         }
         
         guard let services = peripheral.services else {
-            statusMessage = "No services found"
+            print("⚠️ No services found - trying to discover specific service...")
+            
+            if serviceDiscoveryRetryCount < maxServiceDiscoveryRetries {
+                serviceDiscoveryRetryCount += 1
+                // Sometimes iOS doesn't return services immediately for paired devices
+                // Try discovering the specific service UUID
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    print("🔄 Retrying service discovery (\(self.serviceDiscoveryRetryCount)/\(self.maxServiceDiscoveryRetries))...")
+                    peripheral.discoverServices([self.serviceUUID])
+                }
+            } else {
+                print("❌ Max retries reached - no services found")
+                statusMessage = "⚠️ Could not find services. Try disconnecting and reconnecting."
+                serviceDiscoveryRetryCount = 0
+            }
             return
         }
+        
+        // Reset retry counter on successful service discovery
+        serviceDiscoveryRetryCount = 0
         
         print("🔍 Found \(services.count) services:")
         var foundConfigService = false
