@@ -123,7 +123,6 @@ struct ContentView: View {
     
     // Force UI refresh trigger
     @State private var customsRefreshTrigger = false
-    @State private var isShowingBluetoothView = false
 
     // Preset system - RENAMED TO CUSTOMS
     @AppStorage("custom1") private var custom1Data: String = ""
@@ -435,7 +434,8 @@ struct ContentView: View {
     }
     
     private func navigateToBluetoothView() {
-        isShowingBluetoothView = true
+        bleManager.startScan()
+        showDeviceSheet = true
     }
     
     private var mainNavigationView: some View {
@@ -454,10 +454,6 @@ struct ContentView: View {
                     .navigationBarTitleTextColor(.white)
                     .navigationTitle("CliQ")
                     .navigationBarTitleDisplayMode(.inline)
-            }
-            .navigationDestination(isPresented: $isShowingBluetoothView) {
-                BluetoothConnectionView(bleManager: bleManager)
-                    .navigationBarBackButtonHidden(true)
             }
         }
         .onReceive(bleManager.$isConnected) { connected in
@@ -953,7 +949,12 @@ struct ContentView: View {
         ToolbarItem(placement: .navigationBarLeading) {
             HStack(spacing: 10) {
                 Button(action: {
-                    isShowingBluetoothView = true
+                    if bleManager.isConnected {
+                        bleManager.disconnect()
+                    } else {
+                        bleManager.startScan()
+                        showDeviceSheet = true
+                    }
                 }) {
                     Image(systemName: bluetoothIconName)
                         .foregroundColor(.white)
@@ -1053,7 +1054,8 @@ struct ContentView: View {
             
             if !bleManager.isConnected && shouldAutoShowBluetooth {
                 print("📱 First launch after onboarding - showing Bluetooth view automatically")
-                isShowingBluetoothView = true
+                bleManager.startScan()
+                showDeviceSheet = true
                 // Reset the flag so we don't show it again
                 UserDefaults.standard.set(false, forKey: "shouldAutoShowBluetoothAfterOnboarding")
             }
