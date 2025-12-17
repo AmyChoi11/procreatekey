@@ -386,11 +386,25 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
         let deviceName = peripheral.name ?? "Unknown"
         let isConnectable = advertisementData[CBAdvertisementDataIsConnectable] as? Bool ?? false
         
-        // Debug: Log ALL discovered devices
-        print("🔍 Discovered: \(deviceName) - RSSI: \(RSSI.intValue) - Connectable: \(isConnectable)")
-        if let localName = advertisementData[CBAdvertisementDataLocalNameKey] as? String {
-            print("   Local Name: \(localName)")
+        // FULL DEBUG: Log EVERYTHING
+        print("🔍 FULL DISCOVERY INFO:")
+        print("   Peripheral name: \(peripheral.name ?? "nil")")
+        print("   RSSI: \(RSSI.intValue)")
+        print("   Connectable: \(isConnectable)")
+        print("   Advertisement data keys:")
+        
+        // Print all advertisement data
+        for (key, value) in advertisementData {
+            print("      \(key): \(value)")
         }
+        
+        // Check local name specifically
+        var nameToCheck = deviceName
+        if let localName = advertisementData[CBAdvertisementDataLocalNameKey] as? String {
+            print("   ✅ Local Name in adv data: '\(localName)'")
+            nameToCheck = localName
+        }
+        
         if let serviceUUIDs = advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID] {
             print("   Services: \(serviceUUIDs.map { $0.uuidString })")
         } else {
@@ -403,16 +417,20 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
             return
         }
         
-        // Check if device name starts with "CliQ"
-        guard deviceName.hasPrefix("CliQ") else {
-            print("   ❌ Rejected: Name doesn't start with 'CliQ'")
+        // Check if device name is "CliQ Controller" or contains "CliQ"
+        let isCliQDevice = nameToCheck == "CliQ Controller" || nameToCheck.contains("CliQ")
+        
+        guard isCliQDevice else {
+            print("   ❌ Rejected: Name '\(nameToCheck)' doesn't match 'CliQ Controller' or contain 'CliQ'")
             return
         }
+        
+        print("   🎯 FOUND OUR DEVICE: \(nameToCheck)")
         
         // Accept device even if not advertising config service
         // (it might be paired as keyboard but still has config service available)
         if !devices.contains(where: { $0.identifier == peripheral.identifier }) {
-            print("   ✅ ACCEPTED: Adding to device list (may be paired as keyboard)")
+            print("   ✅ ACCEPTED: Adding to device list")
             devices.append(peripheral)
             statusMessage = "Found \(devices.count) device(s)..."
         } else {
