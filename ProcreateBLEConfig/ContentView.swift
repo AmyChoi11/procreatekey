@@ -1612,22 +1612,6 @@ struct DeviceSelectionSheet: View {
                             Text("").font(.caption)
                             Text("⚠️ If device was paired to iPad:").font(.subheadline).bold().foregroundColor(.red)
                             Text("Go to Settings → Bluetooth → Forget 'CliQ Controller'").font(.caption).foregroundColor(.red)
-                }
-            }
-            .navigationTitle("Select Device")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Cancel") {
-                        bleManager.stopScan()
-                        showDeviceSheet = false
-                    }
-                }
-            }
-        }
-    }
-}
-                            Text("Go to Settings  Bluetooth  Forget 'CliQ Controller'").font(.caption).foregroundColor(.red)
                         }
                         .padding()
                         .background(Color.red.opacity(0.1))
