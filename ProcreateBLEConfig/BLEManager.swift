@@ -136,6 +136,14 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
             if deviceName.hasPrefix("CliQ") && !devices.contains(where: { $0.identifier == peripheral.identifier }) {
                 devices.append(peripheral)
                 print("   ➕ Added to device list")
+                
+                // Auto-connect to already paired device
+                if !isConnected {
+                    print("   🔌 Auto-connecting to paired device...")
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        self.connect(to: peripheral)
+                    }
+                }
             }
         }
         
