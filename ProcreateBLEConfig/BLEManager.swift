@@ -569,6 +569,11 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
                 configChar = char
                 statusMessage = "✓ Ready to configure!"
                 print("✓ Found config characteristic!")
+                
+                // Enable notifications to receive automatic updates when switch changes
+                peripheral.setNotifyValue(true, for: char)
+                print("🔔 Enabled notifications for config updates")
+                
                 // Wait a moment before reading to ensure device is ready
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     print("📖 Reading current config from ESP32...")
