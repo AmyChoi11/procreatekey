@@ -6,6 +6,7 @@ struct HelpView: View {
     @State private var selectedCategory: HelpCategory?
     @State private var selectedIssue: HelpIssue?
     @State private var showDetectedProblem: DetectedProblem?
+    @State private var refreshTrigger = false
     
     var body: some View {
         NavigationView {
@@ -131,10 +132,12 @@ struct HelpView: View {
                 DetectedProblemView(problem: problem)
             }
             .onAppear {
+                refreshTrigger.toggle()
                 if let problem = bleManager.detectedProblem {
                     showDetectedProblem = problem
                 }
             }
+            .id(refreshTrigger)
         }
     }
 }
