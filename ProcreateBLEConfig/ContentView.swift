@@ -198,6 +198,10 @@ struct ContentView: View {
                                 showHelp = true
                             }
                         }
+                        .onChange(of: bleManager.currentConfig) { newConfig in
+                            print("🔄 Config updated from device: \(newConfig)")
+                            config = newConfig
+                        }
                         .onChange(of: bleManager.currentCustom) { newCustom in
                             print("🔄 Active custom changed to: \(newCustom)")
                             customsRefreshTrigger.toggle()
@@ -432,7 +436,7 @@ struct ContentView: View {
                     .toolbarBackground(.visible, for: .navigationBar)
                     .toolbarColorScheme(.dark, for: .navigationBar)
                     .navigationBarTitleTextColor(.white)
-                    .navigationTitle("CliQ")
+                    .navigationTitle("cliq")
                     .navigationBarTitleDisplayMode(.inline)
             }
             .navigationDestination(isPresented: $isShowingBluetoothView) {
