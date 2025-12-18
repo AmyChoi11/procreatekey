@@ -16,9 +16,9 @@
  * - Button 1+2: Combo function
  * - Scroll Wheel (Pin 7/6): Brush size control (rotate to adjust)
  * - 3-Position Switch:
- *   • Left Pin (Pin 14): Custom 1
+ *   • Left Pin (Pin 1): Custom 1
  *   • Middle Pin (VCC): Common power
- *   • Right Pin (Pin 15): Custom 3
+ *   • Right Pin (Pin 3): Custom 3
  *   • Middle position: Custom 2
  * 
  * CUSTOM PRESETS:
@@ -67,13 +67,17 @@ volatile int lastEncoded = 0;
 volatile unsigned long lastEncoderTime = 0;
 const unsigned long ENCODER_DEBOUNCE = 5;
 
+// ============= Switch Settings =============
+#define SWITCH_DEBOUNCE_DELAY 100  // 100ms debounce
+#define SWITCH_DEBUG_INTERVAL 2000 // Debug every 2 seconds
+
 // ============= Button Configuration =============
 struct ButtonConfig {
   int button1 = 3;  // Default: Undo
   int button2 = 3;  // Default: Undo
   int button3 = 3;  // Default: Undo
   int combo = 7;    // Default: Color Palette
-  int scroll = 9;     // Default: Brush Size 10%
+  int scroll = 9;   // Default: Brush Size 10%
 } config;
 
 // ============= Custom Preset System =============
@@ -97,6 +101,12 @@ BLECharacteristic* configChar = nullptr;
 bool deviceConnected = false;
 bool oldDeviceConnected = false;
 
+// ============= Switch Timing =============
+unsigned long lastSwitchCheck = 0;
+unsigned long lastConfigBroadcast = 0;
+unsigned long lastDebugTime = 0;
+#define CONFIG_BROADCAST_INTERVAL 1000  // Send config every second
+
 // ============= Helper Functions =============
 const char* getCustomName(int customNum) {
   switch(customNum) {
@@ -107,11 +117,117 @@ const char* getCustomName(int customNum) {
   }
 }
 
+void sendCurrentConfigToApp();
+
+// ============= Switch Mode Detection =============
+int getSwitchMode() {
+  int leftState = digitalRead(SWITCH_LEFT);
+  int rightState = digitalRead(SWITCH_RIGHT);
+  
+  // IMPORTANT: Check if using PULLDOWN or PULLUP resistors!
+  // With INPUT_PULLDOWN (default):
+  // - LOW = not pressed
+  // - HIGH = pressed (connected to 3.3V)
+  
+  // Custom 1: Left=HIGH, Right=LOW (switch to left)
+  if (leftState == HIGH && rightState == LOW) return 0;
+  
+  // Custom 2: Left=LOW, Right=LOW (switch in middle)
+  if (leftState == LOW && rightState == LOW) return 1;
+  
+  // Custom 3: Left=LOW, Right=HIGH (switch to right)
+  if (leftState == LOW && rightState == HIGH) return 2;
+  
+  // Default to Custom 2 if invalid state
+  return 1;
+}
+
+// ============= Test Switch Function =============
+void testSwitch() {
+  Serial.println("\n🔧 TESTING 3-POSITION SWITCH:");
+  Serial.println("Move switch through positions:");
+  Serial.println("1. Left (Custom 1)");
+  Serial.println("2. Middle (Custom 2)");
+  Serial.println("3. Right (Custom 3)");
+  Serial.println("Reading values for 10 seconds...");
+  
+  for (int i = 0; i < 10; i++) {
+    int leftState = digitalRead(SWITCH_LEFT);
+    int rightState = digitalRead(SWITCH_RIGHT);
+    int mode = getSwitchMode();
+    
+    Serial.printf("  Left=%d, Right=%d, Mode=%d (%s)\n",
+                  leftState, rightState, mode, getCustomName(mode));
+    delay(1000);
+  }
+  Serial.println("Test complete!\n");
+}
+
+// ============= Load Custom Function =============
+void loadCustom(int customNum) {
+  if (customNum < 0 || customNum >= MAX_CUSTOMS) return;
+  
+  // Load custom preset from flash
+  prefs.begin("customs", true);
+  String prefix = "c" + String(customNum) + "_";
+  
+  int b1 = prefs.getInt((prefix + "b1").c_str(), -1);
+  
+  // Only load if custom exists (button1 != -1)
+  if (b1 != -1) {
+    config.button1 = b1;
+    config.button2 = prefs.getInt((prefix + "b2").c_str(), 3);
+    config.button3 = prefs.getInt((prefix + "b3").c_str(), 3);
+    config.combo = prefs.getInt((prefix + "combo").c_str(), 7);
+    config.scroll = prefs.getInt((prefix + "scroll").c_str(), 9);
+    
+    Serial.printf("✅ Loaded %s\n", getCustomName(customNum));
+    Serial.printf("   Button 1: %d, Button 2: %d, Button 3: %d, Combo: %d, Scroll: %d\n",
+                  config.button1, config.button2, config.button3, config.combo, config.scroll);
+  } else {
+    // Custom not saved yet - keep current config (inherit from previous)
+    Serial.printf("⚠️ %s not saved - keeping current config\n", getCustomName(customNum));
+    Serial.printf("   Button 1: %d, Button 2: %d, Button 3: %d, Combo: %d, Scroll: %d\n",
+                  config.button1, config.button2, config.button3, config.combo, config.scroll);
+  }
+  
+  prefs.end();
+  currentCustom = customNum;
+  
+  // Notify iOS app about the change
+  sendCurrentConfigToApp();
+}
+
+// ============= Send Config to iOS App =============
+void sendCurrentConfigToApp() {
+  if (!configChar || !deviceConnected) return;
+  
+  DynamicJsonDocument doc(256);
+  JsonObject buttons = doc.createNestedObject("buttons");
+  buttons["button1"] = config.button1;
+  buttons["button2"] = config.button2;
+  buttons["button3"] = config.button3;
+  buttons["combo"] = config.combo;
+  buttons["scroll"] = config.scroll;
+  doc["currentCustom"] = currentCustom;  // Critical: Tell iOS which custom is active
+  
+  String output;
+  serializeJson(doc, output);
+  configChar->setValue(output.c_str());
+  configChar->notify();  // Actively notify iOS of the change
+  
+  Serial.println("📤 Notified iOS app of switch change:");
+  Serial.println(output);
+}
+
 // ============= BLE Server Callbacks =============
 class ServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) {
     deviceConnected = true;
     Serial.println("✓ Client connected");
+    // Send current config immediately when connected
+    delay(100);
+    sendCurrentConfigToApp();
   }
   
   void onDisconnect(BLEServer* pServer) {
@@ -129,7 +245,7 @@ class ServerCallbacks : public BLEServerCallbacks {
 class ConfigCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic* pChar) {
     Serial.println("\n🔔 Config write received!");
-    String value = pChar->getValue();
+    std::string value = pChar->getValue();
     
     if (value.length() > 0) {
       Serial.println("========================================");
@@ -143,6 +259,17 @@ class ConfigCallbacks : public BLECharacteristicCallbacks {
       if (error) {
         Serial.print("❌ JSON parse failed: ");
         Serial.println(error.c_str());
+        return;
+      }
+      
+      // Check for command first
+      if (doc.containsKey("command")) {
+        String command = doc["command"].as<String>();
+        
+        if (command == "getSwitch") {
+          Serial.println("📱 iOS requested switch position");
+          sendCurrentConfigToApp();
+        }
         return;
       }
       
@@ -203,6 +330,9 @@ class ConfigCallbacks : public BLECharacteristicCallbacks {
         Serial.printf("  Combo (1+2): %d\n", configToSave.combo);
         Serial.printf("  Scroll: %d\n", configToSave.scroll);
         Serial.println("========================================\n");
+        
+        // Send updated config back to iOS
+        sendCurrentConfigToApp();
       } else {
         Serial.println("⚠️ No 'buttons' key in JSON");
       }
@@ -210,6 +340,8 @@ class ConfigCallbacks : public BLECharacteristicCallbacks {
   }
   
   void onRead(BLECharacteristic* pChar) {
+    Serial.println("📤 iOS requested config via read");
+    
     DynamicJsonDocument doc(256);
     JsonObject buttons = doc.createNestedObject("buttons");
     buttons["button1"] = config.button1;
@@ -222,7 +354,8 @@ class ConfigCallbacks : public BLECharacteristicCallbacks {
     String output;
     serializeJson(doc, output);
     pChar->setValue(output.c_str());
-    Serial.println("📤 Config read:");
+    
+    Serial.println("Sent to iOS:");
     Serial.println(output);
   }
 };
@@ -328,55 +461,6 @@ void sendBrushKey10(bool increase) {
   input->notify();
 }
 
-// ============= Switch Mode Detection =============
-int getSwitchMode() {
-  int leftState = digitalRead(SWITCH_LEFT);
-  int rightState = digitalRead(SWITCH_RIGHT);
-  
-  // Custom 1: Left=HIGH, Right=LOW (switch to left)
-  if (leftState == HIGH && rightState == LOW) return 0;
-  
-  // Custom 2: Left=LOW, Right=LOW (switch in middle)
-  if (leftState == LOW && rightState == LOW) return 1;
-  
-  // Custom 3: Left=LOW, Right=HIGH (switch to right)
-  if (leftState == LOW && rightState == HIGH) return 2;
-  
-  // Default to Custom 2 if invalid state
-  return 1;
-}
-
-void loadCustom(int customNum) {
-  if (customNum < 0 || customNum >= MAX_CUSTOMS) return;
-  
-  // Load custom preset from flash
-  prefs.begin("customs", true);
-  String prefix = "c" + String(customNum) + "_";
-  
-  int b1 = prefs.getInt((prefix + "b1").c_str(), -1);
-  
-  // Only load if custom exists (button1 != -1)
-  if (b1 != -1) {
-    config.button1 = b1;
-    config.button2 = prefs.getInt((prefix + "b2").c_str(), 3);
-    config.button3 = prefs.getInt((prefix + "b3").c_str(), 3);
-    config.combo = prefs.getInt((prefix + "combo").c_str(), 7);
-    config.scroll = prefs.getInt((prefix + "scroll").c_str(), 9);
-    
-    Serial.printf("✅ Loaded %s\n", getCustomName(customNum));
-    Serial.printf("   Button 1: %d, Button 2: %d, Button 3: %d, Combo: %d, Scroll: %d\n",
-                  config.button1, config.button2, config.button3, config.combo, config.scroll);
-  } else {
-    // Custom not saved yet - keep current config (inherit from previous)
-    Serial.printf("⚠️ %s not saved - keeping current config\n", getCustomName(customNum));
-    Serial.printf("   Button 1: %d, Button 2: %d, Button 3: %d, Combo: %d, Scroll: %d\n",
-                  config.button1, config.button2, config.button3, config.combo, config.scroll);
-  }
-  
-  prefs.end();
-  currentCustom = customNum;
-}
-
 // ============= Encoder Interrupt =============
 void IRAM_ATTR handleEncoder() {
   unsigned long currentTime = millis();
@@ -414,8 +498,13 @@ void setup() {
   pinMode(BUTTON3_PIN, INPUT_PULLUP);
   pinMode(ENCODER_A, INPUT_PULLUP);
   pinMode(ENCODER_B, INPUT_PULLUP);
-  pinMode(SWITCH_LEFT, INPUT_PULLDOWN);   // 3-position switch left
-  pinMode(SWITCH_RIGHT, INPUT_PULLDOWN);  // 3-position switch right
+  
+  // IMPORTANT: Try INPUT_PULLDOWN first. If switch readings are wrong, try INPUT_PULLUP
+  pinMode(SWITCH_LEFT, INPUT_PULLDOWN);   // 3-position switch left (Custom 1)
+  pinMode(SWITCH_RIGHT, INPUT_PULLDOWN);  // 3-position switch right (Custom 3)
+  
+  // Test switch at startup
+  testSwitch();
   
   attachInterrupt(digitalPinToInterrupt(ENCODER_A), handleEncoder, CHANGE);
   attachInterrupt(digitalPinToInterrupt(ENCODER_B), handleEncoder, CHANGE);
@@ -465,7 +554,7 @@ void setup() {
   
   // Security for HID (required by iOS)
   BLESecurity* security = new BLESecurity();
-  security->setAuthenticationMode(ESP_LE_AUTH_REQ_SC_BOND);
+  security->setAuthenticationMode(ESP_LE_AUTH_BOND);
   
   const uint8_t reportMap[] = {
     0x05, 0x01, 0x09, 0x06, 0xA1, 0x01, 0x85, 0x01, 0x05, 0x07,
@@ -486,7 +575,7 @@ void setup() {
   
   configChar = configService->createCharacteristic(
     CHAR_UUID_CONFIG,
-    BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE
+    BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_NOTIFY
   );
   configChar->setCallbacks(new ConfigCallbacks());
   configChar->addDescriptor(new BLE2902());
@@ -525,25 +614,46 @@ static unsigned long button2PressTime = 0;
 const unsigned long COMBO_DETECTION_DELAY = 50;  // 50ms window to detect combo press
 
 void loop() {
-  // ========== CUSTOM PRESET SWITCHING ==========
-  // Check 3-position switch for custom changes
-  int currentMode = getSwitchMode();
-  if (currentMode != lastSwitchMode) {
-    // Debounce
-    delay(50);
-    currentMode = getSwitchMode();
+  unsigned long currentTime = millis();
+  
+  // ========== SWITCH DEBUG OUTPUT (every 2 seconds) ==========
+  if (currentTime - lastDebugTime > SWITCH_DEBUG_INTERVAL) {
+    lastDebugTime = currentTime;
+    int leftState = digitalRead(SWITCH_LEFT);
+    int rightState = digitalRead(SWITCH_RIGHT);
+    int mode = getSwitchMode();
+    Serial.printf("🔌 Switch Status: Left=%d, Right=%d, Mode=%d (%s)\n", 
+                  leftState, rightState, mode, getCustomName(mode));
+  }
+  
+  // ========== CUSTOM PRESET SWITCHING (with debounce) ==========
+  if (currentTime - lastSwitchCheck > SWITCH_DEBOUNCE_DELAY) {
+    lastSwitchCheck = currentTime;
     
+    int currentMode = getSwitchMode();
     if (currentMode != lastSwitchMode) {
-      Serial.println("\n========================================");
-      Serial.printf("🔄 CUSTOM SWITCH DETECTED\n");
-      Serial.printf("   Previous: %s\n", getCustomName(lastSwitchMode));
-      Serial.printf("   New: %s\n", getCustomName(currentMode));
+      // Double-check after debounce
+      delay(20);
+      int verifiedMode = getSwitchMode();
       
-      loadCustom(currentMode);
-      lastSwitchMode = currentMode;
-      
-      Serial.println("========================================\n");
+      if (verifiedMode != lastSwitchMode) {
+        Serial.println("\n========================================");
+        Serial.printf("🔄 CUSTOM SWITCH DETECTED\n");
+        Serial.printf("   Previous: %s\n", getCustomName(lastSwitchMode));
+        Serial.printf("   New: %s\n", getCustomName(verifiedMode));
+        
+        loadCustom(verifiedMode);
+        lastSwitchMode = verifiedMode;
+        
+        Serial.println("========================================\n");
+      }
     }
+  }
+  
+  // ========== BROADCAST CONFIG TO iOS (every second when connected) ==========
+  if (deviceConnected && currentTime - lastConfigBroadcast > CONFIG_BROADCAST_INTERVAL) {
+    lastConfigBroadcast = currentTime;
+    sendCurrentConfigToApp();
   }
   
   // ========== KEYBOARD FUNCTIONS ==========
@@ -568,7 +678,6 @@ void loop() {
     bool btn2Low = (digitalRead(BUTTON2_PIN) == LOW);
     bool btn3Low = (digitalRead(BUTTON3_PIN) == LOW);
     bool bothPressed = btn1Low && btn2Low;
-    unsigned long currentTime = millis();
     
     // Track button press times - ONLY SET ONCE on first press
     if (btn1Low && !button1Pressed && button1PressTime == 0) {
@@ -654,6 +763,8 @@ void loop() {
   if (deviceConnected && !oldDeviceConnected) {
     oldDeviceConnected = deviceConnected;
     Serial.println("✓ Device connected - keyboard active");
+    delay(100);
+    sendCurrentConfigToApp();  // Send config immediately on connection
   }
   
   if (!deviceConnected && oldDeviceConnected) {

@@ -1035,6 +1035,7 @@ struct ContentView: View {
         case .background:
             print("📱 App going to background")
             appWasInBackground = true
+            bleManager.pauseBLEOperations()
             
         case .inactive:
             print("📱 App inactive")
@@ -1049,10 +1050,13 @@ struct ContentView: View {
                 showSplashOnActive = true
             }
             
+            // Resume BLE operations when app becomes active
+            bleManager.resumeBLEOperations()
+            
             // Reset for next time
             appWasInBackground = false
             
-            // BLE manager handles this via notifications
+            // Refresh UI after resuming
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                 if self.bleManager.isConnected {
                     self.customsRefreshTrigger.toggle()

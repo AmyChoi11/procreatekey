@@ -49,8 +49,14 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
     
     // MARK: - Lifecycle Management
     
+    func setAppActive(_ active: Bool) {
+        isAppActive = active
+        print("📱 App active state: \(active)")
+    }
+    
     func pauseBLEOperations() {
         print("⏸️ Pausing BLE operations")
+        isAppActive = false
         stopAllTimers()
         
         if isScanning {
@@ -60,11 +66,7 @@ class BLEManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeriph
     
     func resumeBLEOperations() {
         print("▶️ Resuming BLE operations")
-        
-        guard isAppActive else {
-            print("⚠️ App not active, not resuming")
-            return
-        }
+        isAppActive = true
         
         if isConnected {
             print("✅ Starting timers for connected device")
