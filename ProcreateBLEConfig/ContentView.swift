@@ -86,11 +86,22 @@ struct ContentView: View {
         "scroll": 6     // Brush Size ±5%
     ]  // Undo, Erase, Brush Library, Brush Size 5%
     
-    @State private var showDeviceSheet = false
+    // Sheet presentation enum
+    enum ActiveSheet: Identifiable {
+        case deviceSelection, onboarding, help
+        
+        var id: Int {
+            switch self {
+            case .deviceSelection: return 0
+            case .onboarding: return 1
+            case .help: return 2
+            }
+        }
+    }
+    
+    @State private var activeSheet: ActiveSheet?
     @State private var hasShownInitialSheet = false
-    @State private var showOnboarding = false
     @State private var showInteractiveTutorial = false
-    @State private var showHelp = false
     
     // Store actual view frames for tutorial
     @State private var button1Frame: CGRect = .zero
@@ -176,15 +187,22 @@ struct ContentView: View {
             GeometryReader { geometry in
                 ZStack {
                     mainNavigationView
-                        .sheet(isPresented: $showDeviceSheet) {
-                            DeviceSelectionSheet(bleManager: bleManager, showDeviceSheet: $showDeviceSheet)
-                        }
-                        .sheet(isPresented: $showOnboarding) {
-                            OnboardingView(showOnboarding: $showOnboarding)
-                        }
-                        .sheet(isPresented: $showHelp) {
-                            HelpView()
-                                .environmentObject(bleManager)
+                        .sheet(item: $activeSheet) { sheet in
+                            switch sheet {
+                            case .deviceSelection:
+                                DeviceSelectionSheet(bleManager: bleManager, showDeviceSheet: Binding(
+                                    get: { activeSheet == .deviceSelection },
+                                    set: { if !$0 { activeSheet = nil } }
+                                ))
+                            case .onboarding:
+                                OnboardingView(showOnboarding: Binding(
+                                    get: { activeSheet == .onboarding },
+                                    set: { if !$0 { activeSheet = nil } }
+                                ))
+                            case .help:
+                                HelpView()
+                                    .environmentObject(bleManager)
+                            }
                         }
                         .onAppear {
                             handleOnAppear()
@@ -195,7 +213,7 @@ struct ContentView: View {
                         }
                         .onChange(of: bleManager.detectedProblem) { problem in
                             if problem != nil {
-                                showHelp = true
+                                activeSheet = .help
                             }
                         }
                         .onChange(of: bleManager.currentConfig) { newConfig in
@@ -445,7 +463,7 @@ struct ContentView: View {
         }
         .onReceive(bleManager.$isConnected) { connected in
             if connected {
-                showDeviceSheet = false
+                activeSheet = nil
                 isShowingBluetoothView = false  // Close Bluetooth page when connected
             }
         }
@@ -1260,7 +1278,7 @@ struct ContentView: View {
             
             Button(action: {
                 showHelpDropdown = false
-                showHelp = true
+                activeSheet = .help
             }) {
                 HStack {
                     Image(systemName: "questionmark.circle")
